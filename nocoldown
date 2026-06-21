@@ -1,0 +1,696 @@
+--!strict
+-- =========================================================================
+-- DUNGEON QUEST SPAMMER & TWEEN FARM - XENO EXECUTOR (LUAU + RAYFIELD)
+-- VERSÃO CORRIGIDA - OCULTA SÓ HABILIDADES, NÃO O MAPA
+-- =========================================================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Dungeon Quest Hub | Xeno",
+   LoadingTitle = "Carregando o Hub...",
+   LoadingSubtitle = "Auto Farm & Spammer",
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil,
+      FileName = "DQHub"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = false,
+})
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+
+getgenv().SpammerAtivo = false
+getgenv().TweenFarmAtivo = false
+getgenv().NoVFXAtivo = false
+getgenv().TweenHeight = 5
+getgenv().TweenSpeed = 20
+getgenv().VelocidadeExtra = false
+
+local vfxConnection = nil
+local spamLoop = nil
+local farmLoop = nil
+local speedLoop = nil
+local originalWalkSpeed = 16
+local speedMultiplier = 1.3
+
+-- =========================================================================
+-- OCULTAR SÓ HABILIDADES (NÃO MEXE NO MAPA)
+-- =========================================================================
+local function isHabilidade(nome: string)
+    nome = string.upper(nome)
+    local keywords = {
+        "PULSE", "LIGHTNING", "MAGIC", "EFFECT", "SPELL", "ATTACK",
+        "BOMB", "EXPLOSION", "BLAST", "FIRE", "ICE", "THUNDER",
+        "STORM", "WIND", "EARTH", "WATER", "SHADOW", "LIGHT",
+        "DARK", "HOLY", "DEMON", "DRAGON", "PHOENIX", "WOLF",
+        "SKILL", "POWER", "BURST", "SLASH", "CUT", "STAB",
+        "PIERCE", "CRUSH", "SMASH", "BEAM", "BALL", "WAVE",
+        "AURA", "FIELD", "ZONE", "CIRCLE", "RING", "ORB",
+        "PROJECTILE", "MISSILE", "LASER", "RAY", "BOLT",
+        "SHOCK", "FLAME", "FROST", "SPARK", "GLOW", "RADIANT"
+    }
+    
+    for _, keyword in ipairs(keywords) do
+        if string.match(nome, keyword) then
+            return true
+        end
+    end
+    return false
+end
+
+local function estaEmFerramenta(obj: Instance)
+    local current = obj
+    while current do
+        if current:IsA("Tool") then
+            return true
+        end
+        current = current.Parent
+    end
+    return false
+end
+
+local function ocultarHabilidade(obj: Instance)
+    if not getgenv().NoVFXAtivo then return end
+    
+    pcall(function()
+        -- SÓ OCULTA SE FOR HABILIDADE
+        local ehHabilidade = isHabilidade(obj.Name)
+        if not ehHabilidade and obj.Parent then
+            ehHabilidade = isHabilidade(obj.Parent.Name)
+        end
+        
+        -- Verifica se está em uma ferramenta (habilidade)
+        local emFerramenta = estaEmFerramenta(obj)
+        
+        -- SÓ oculta se for habilidade OU estiver em ferramenta
+        if not ehHabilidade and not emFerramenta then
+            return
+        end
+        
+        -- OCULTA PARTÍCULAS (só de habilidades)
+        if obj:IsA("ParticleEmitter") then
+            obj.Enabled = false
+            obj.Rate = 0
+            return
+        end
+        
+        -- OCULTA TRAIL (rastro)
+        if obj:IsA("Trail") then
+            obj.Enabled = false
+            return
+        end
+        
+        -- OCULTA BEAM (feixe)
+        if obj:IsA("Beam") then
+            obj.Enabled = false
+            return
+        end
+        
+        -- OCULTA FOGO
+        if obj:IsA("Fire") then
+            obj.Enabled = false
+            obj.Size = 0
+            return
+        end
+        
+        -- OCULTA FUMAÇA
+        if obj:IsA("Smoke") then
+            obj.Enabled = false
+            return
+        end
+        
+        -- OCULTA CHISPAS
+        if obj:IsA("Sparkles") then
+            obj.Enabled = false
+            return
+        end
+        
+        -- OCULTA EXPLOSÕES (destrói)
+        if obj:IsA("Explosion") then
+            obj:Destroy()
+            return
+        end
+        
+        -- OCULTA LUZES (só de habilidades)
+        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+            obj.Enabled = false
+            return
+        end
+        
+        -- OCULTA SONS (só de habilidades)
+        if obj:IsA("Sound") then
+            obj.Volume = 0
+            obj:Stop()
+            return
+        end
+        
+        -- OCULTA DECALS (só de habilidades)
+        if obj:IsA("Decal") or obj:IsA("Texture") then
+            if obj.Parent and isHabilidade(obj.Parent.Name) then
+                obj.Transparency = 1
+            end
+            return
+        end
+        
+        -- OCULTA PARTES (só se for claramente habilidade)
+        if obj:IsA("BasePart") then
+            -- Verifica se é uma parte de habilidade
+            local ehParteHabilidade = false
+            
+            -- Nome é de habilidade
+            if isHabilidade(obj.Name) then
+                ehParteHabilidade = true
+            end
+            
+            -- Pai é de habilidade
+            if obj.Parent and isHabilidade(obj.Parent.Name) then
+                ehParteHabilidade = true
+            end
+            
+            -- Verifica características de habilidade
+            if obj.Transparency and obj.Transparency < 0.5 and obj.CanCollide == false and obj.Anchored then
+                ehParteHabilidade = true
+            end
+            
+            -- Está dentro de uma ferramenta
+            if emFerramenta then
+                ehParteHabilidade = true
+            end
+            
+            if ehParteHabilidade then
+                obj.Transparency = 1
+                obj.CanCollide = false
+                -- NÃO muda o material para não bugar o mapa
+            end
+            return
+        end
+        
+        -- OCULTA GUI (só de habilidades)
+        if obj:IsA("BillboardGui") or obj:IsA("ScreenGui") or obj:IsA("SurfaceGui") then
+            if isHabilidade(obj.Name) or (obj.Parent and isHabilidade(obj.Parent.Name)) then
+                obj.Enabled = false
+            end
+            return
+        end
+        
+        -- OCULTA MESHES (só de habilidades)
+        if obj:IsA("SpecialMesh") or obj:IsA("CylinderMesh") or obj:IsA("BlockMesh") then
+            if isHabilidade(obj.Name) or (obj.Parent and isHabilidade(obj.Parent.Name)) then
+                obj.Visible = false
+            end
+            return
+        end
+    end)
+end
+
+-- =========================================================================
+-- SCANEAR E OCULTAR SÓ HABILIDADES
+-- =========================================================================
+local function scanearOcultar()
+    if not getgenv().NoVFXAtivo then return end
+    
+    pcall(function()
+        -- Só escaneia objetos que podem ser habilidades
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            -- Pula objetos do mapa (chão, paredes, etc)
+            if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") then
+                -- Verifica se é parte do mapa ou cenário
+                local parentName = string.upper(obj.Parent.Name)
+                if string.match(parentName, "MAP") or string.match(parentName, "FLOOR") or 
+                   string.match(parentName, "WALL") or string.match(parentName, "GROUND") or
+                   string.match(parentName, "TERRAIN") then
+                    -- PULA (NÃO OCULTA O MAPA)
+                    continue
+                end
+            end
+            
+            -- Só oculta se for habilidade
+            ocultarHabilidade(obj)
+        end
+        
+        -- NÃO MEXE NO LIGHTING (não oculta efeitos de pós-processamento)
+    end)
+end
+
+-- =========================================================================
+-- ABA: COMBATE (SPAMMER)
+-- =========================================================================
+local CombatTab = Window:CreateTab("Combate", 4483345998)
+local CombatSection = CombatTab:CreateSection("Auto Cast Sem Cooldown")
+
+CombatTab:CreateToggle({
+   Name = "Spam TODAS as Habilidades",
+   CurrentValue = false,
+   Flag = "SpamToggle", 
+   Callback = function(Value)
+        getgenv().SpammerAtivo = Value
+        if Value then
+            iniciarSpammer()
+        else
+            pararSpammer()
+        end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Ocultar Efeitos e Som (Mais FPS)",
+   CurrentValue = false,
+   Flag = "NoVFXToggle", 
+   Callback = function(Value)
+        getgenv().NoVFXAtivo = Value
+        
+        if Value then
+            -- Oculta habilidades existentes
+            scanearOcultar()
+            
+            -- Conecta para novas habilidades
+            if not vfxConnection then
+                vfxConnection = workspace.DescendantAdded:Connect(function(obj)
+                    task.wait(0.01)
+                    -- Só processa se for habilidade
+                    if isHabilidade(obj.Name) or estaEmFerramenta(obj) then
+                        ocultarHabilidade(obj)
+                        -- Oculta os filhos também
+                        for _, child in ipairs(obj:GetDescendants()) do
+                            ocultarHabilidade(child)
+                        end
+                    end
+                end)
+            end
+        else
+            if vfxConnection then
+                vfxConnection:Disconnect()
+                vfxConnection = nil
+            end
+        end
+   end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Velocidade Extra (1.3x Seguro)",
+   CurrentValue = false,
+   Flag = "SpeedToggle",
+   Callback = function(Value)
+        getgenv().VelocidadeExtra = Value
+        if Value then
+            ativarVelocidadeExtra()
+        else
+            desativarVelocidadeExtra()
+        end
+   end,
+})
+
+-- =========================================================================
+-- ABA: AUTO FARM (TWEEN)
+-- =========================================================================
+local FarmTab = Window:CreateTab("Auto Farm", 4483345998)
+local FarmSection = FarmTab:CreateSection("Tween Farm Inteligente")
+
+FarmTab:CreateToggle({
+   Name = "Ligar Tween Farm",
+   CurrentValue = false,
+   Flag = "FarmToggle", 
+   Callback = function(Value)
+        getgenv().TweenFarmAtivo = Value
+        if Value then
+            iniciarFarm()
+        else
+            pararFarm()
+        end
+   end,
+})
+
+FarmTab:CreateSlider({
+   Name = "Altura do Voo (acima do NPC)",
+   Range = {0, 30},
+   Increment = 1,
+   Suffix = " Studs",
+   CurrentValue = 5,
+   Flag = "HeightSlider",
+   Callback = function(Value)
+        getgenv().TweenHeight = Value
+   end,
+})
+
+FarmTab:CreateSlider({
+   Name = "Velocidade do Voo",
+   Range = {5, 40},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 20,
+   Flag = "SpeedSlider",
+   Callback = function(Value)
+        getgenv().TweenSpeed = Value
+   end,
+})
+
+-- =========================================================================
+-- VELOCIDADE EXTRA
+-- =========================================================================
+function ativarVelocidadeExtra()
+    if speedLoop then return end
+    
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        originalWalkSpeed = char.Humanoid.WalkSpeed
+    end
+    
+    speedLoop = RunService.Heartbeat:Connect(function()
+        if not getgenv().VelocidadeExtra then
+            desativarVelocidadeExtra()
+            return
+        end
+        
+        pcall(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            
+            local humanoid = char:FindFirstChild("Humanoid")
+            if humanoid then
+                local targetSpeed = originalWalkSpeed * speedMultiplier
+                if targetSpeed > 25 then targetSpeed = 25 end
+                if humanoid.WalkSpeed ~= targetSpeed then
+                    humanoid.WalkSpeed = targetSpeed
+                end
+            end
+        end)
+    end)
+end
+
+function desativarVelocidadeExtra()
+    if speedLoop then
+        speedLoop:Disconnect()
+        speedLoop = nil
+    end
+    
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = originalWalkSpeed
+    end
+end
+
+-- =========================================================================
+-- SPAMMER COM SPAM DUPLO (MESMO BOTÃO)
+-- =========================================================================
+local function spamRemotes(parentFolder)
+    if not parentFolder then return end
+    
+    for _, item in ipairs(parentFolder:GetChildren()) do
+        if item:IsA("Tool") then
+            -- Pega TODOS os remotes
+            local remotes = {}
+            for _, obj in ipairs(item:GetDescendants()) do
+                if obj:IsA("RemoteEvent") then
+                    table.insert(remotes, obj)
+                end
+            end
+            
+            -- Spama TODOS os remotes (duplo automático)
+            for _, remote in ipairs(remotes) do
+                pcall(function()
+                    local mousePos = LocalPlayer:GetMouse().Hit.Position
+                    remote:FireServer(mousePos)
+                    remote:FireServer(item.Name, mousePos)
+                    remote:FireServer(mousePos, item.Name)
+                end)
+            end
+        end
+    end
+end
+
+function iniciarSpammer()
+    if spamLoop then return end
+    
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        originalWalkSpeed = char.Humanoid.WalkSpeed
+    end
+    
+    spamLoop = RunService.Stepped:Connect(function()
+        if not getgenv().SpammerAtivo then 
+            pararSpammer()
+            return 
+        end
+        
+        pcall(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            
+            local humanoid = char:FindFirstChild("Humanoid")
+            if humanoid and getgenv().VelocidadeExtra then
+                local targetSpeed = originalWalkSpeed * speedMultiplier
+                if targetSpeed > 25 then targetSpeed = 25 end
+                if humanoid.WalkSpeed ~= targetSpeed then
+                    humanoid.WalkSpeed = targetSpeed
+                end
+            end
+            
+            -- Spam em TODOS os remotes (duplo automático)
+            spamRemotes(char)
+            spamRemotes(LocalPlayer:FindFirstChild("Backpack"))
+            
+            -- Ativa TODAS as ferramentas (duplo automático)
+            for _, tool in ipairs(char:GetChildren()) do
+                if tool:IsA("Tool") then
+                    pcall(function()
+                        tool:Activate()
+                        -- Ativa 2x para garantir (spam duplo no mesmo botão)
+                        tool:Activate()
+                    end)
+                end
+            end
+            
+            preventKick()
+        end)
+    end)
+end
+
+function pararSpammer()
+    if spamLoop then
+        spamLoop:Disconnect()
+        spamLoop = nil
+    end
+    
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        if getgenv().VelocidadeExtra then
+            local targetSpeed = originalWalkSpeed * speedMultiplier
+            if targetSpeed > 25 then targetSpeed = 25 end
+            char.Humanoid.WalkSpeed = targetSpeed
+        else
+            char.Humanoid.WalkSpeed = originalWalkSpeed
+        end
+    end
+end
+
+-- =========================================================================
+-- TWEEN FARM
+-- =========================================================================
+local function getClosestEnemy()
+    local closest = nil
+    local shortestDist = math.huge
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = char.HumanoidRootPart.Position
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj.Name ~= LocalPlayer.Name then
+            local hum = obj:FindFirstChild("Humanoid")
+            local hrp = obj:FindFirstChild("HumanoidRootPart")
+            
+            if hum and hrp and hum.Health > 0 then
+                local dist = (hrp.Position - myPos).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    closest = obj
+                end
+            end
+        end
+    end
+    return closest
+end
+
+function iniciarFarm()
+    if farmLoop then return end
+    
+    farmLoop = RunService.Stepped:Connect(function()
+        if not getgenv().TweenFarmAtivo then 
+            pararFarm()
+            return 
+        end
+        
+        pcall(function()
+            local char = LocalPlayer.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            local hrp = char.HumanoidRootPart
+            local humanoid = char:FindFirstChild("Humanoid")
+            
+            if humanoid then
+                humanoid.AutoRotate = true
+                humanoid.Sit = false
+                humanoid.PlatformStand = false
+                
+                if getgenv().VelocidadeExtra then
+                    local targetSpeed = originalWalkSpeed * speedMultiplier
+                    if targetSpeed > 25 then targetSpeed = 25 end
+                    humanoid.WalkSpeed = targetSpeed
+                end
+            end
+            
+            local targetEnemy = getClosestEnemy()
+            
+            if targetEnemy and targetEnemy:FindFirstChild("HumanoidRootPart") then
+                local targetHrp = targetEnemy.HumanoidRootPart
+                local targetHum = targetEnemy:FindFirstChild("Humanoid")
+                
+                if targetHum and targetHum.Health > 0 then
+                    local destPosition = Vector3.new(
+                        targetHrp.Position.x,
+                        targetHrp.Position.y + getgenv().TweenHeight,
+                        targetHrp.Position.z
+                    )
+                    
+                    local currentPos = hrp.Position
+                    local direction = Vector3.new(
+                        destPosition.x - currentPos.x,
+                        0,
+                        destPosition.z - currentPos.z
+                    )
+                    
+                    local distance = direction.Magnitude
+                    
+                    if distance > 0.5 then
+                        local moveSpeed = getgenv().TweenSpeed * 0.3
+                        local moveAmount = math.min(moveSpeed, distance)
+                        local newPos = currentPos + direction.Unit * moveAmount
+                        newPos = Vector3.new(newPos.x, destPosition.y, newPos.z)
+                        hrp.Position = newPos
+                    else
+                        hrp.Position = destPosition
+                    end
+                    
+                    local lookTarget = Vector3.new(targetHrp.Position.x, hrp.Position.y, targetHrp.Position.z)
+                    hrp.CFrame = CFrame.new(hrp.Position, lookTarget)
+                    
+                    -- Spam duplo durante farm
+                    spamRemotes(char)
+                    spamRemotes(LocalPlayer:FindFirstChild("Backpack"))
+                    
+                    for _, tool in ipairs(char:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            pcall(function()
+                                tool:Activate()
+                                tool:Activate() -- Duplo
+                            end)
+                        end
+                    end
+                    
+                    preventKick()
+                end
+            end
+        end)
+    end)
+end
+
+function pararFarm()
+    if farmLoop then
+        farmLoop:Disconnect()
+        farmLoop = nil
+    end
+    
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.AutoRotate = true
+            humanoid.Sit = false
+            
+            if getgenv().VelocidadeExtra then
+                local targetSpeed = originalWalkSpeed * speedMultiplier
+                if targetSpeed > 25 then targetSpeed = 25 end
+                humanoid.WalkSpeed = targetSpeed
+            else
+                humanoid.WalkSpeed = originalWalkSpeed
+            end
+        end
+    end
+end
+
+-- =========================================================================
+-- SISTEMA DE SEGURANÇA
+-- =========================================================================
+local function preventKick()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChild("Humanoid")
+            if humanoid then
+                if getgenv().VelocidadeExtra then
+                    local safeSpeed = originalWalkSpeed * 1.3
+                    if safeSpeed > 25 then safeSpeed = 25 end
+                    if humanoid.WalkSpeed > safeSpeed then
+                        humanoid.WalkSpeed = safeSpeed
+                    end
+                end
+            end
+        end
+    end)
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            preventKick()
+            
+            if not LocalPlayer or not LocalPlayer.Parent then
+                print("⚠️ Desconectado! Reconectando...")
+                TeleportService:Teleport(game.PlaceId)
+            end
+        end)
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    pcall(preventKick)
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        originalWalkSpeed = humanoid.WalkSpeed
+        humanoid.AutoRotate = true
+        humanoid.Sit = false
+        humanoid.PlatformStand = false
+        
+        if getgenv().VelocidadeExtra then
+            local targetSpeed = originalWalkSpeed * speedMultiplier
+            if targetSpeed > 25 then targetSpeed = 25 end
+            humanoid.WalkSpeed = targetSpeed
+        end
+    end
+end)
+
+-- =========================================================================
+-- SCAN PERIÓDICO (SÓ HABILIDADES)
+-- =========================================================================
+task.spawn(function()
+    while task.wait(3) do
+        if getgenv().NoVFXAtivo then
+            scanearOcultar()
+        end
+    end
+end)
