@@ -1,506 +1,643 @@
 --!strict
 -- =========================================================================
--- DUNGEON QUEST SPAMMER & TWEEN FARM - XENO EXECUTOR (LUAU + RAYFIELD)
--- VERSÃO CORRIGIDA - OCULTA SÓ HABILIDADES, NÃO O MAPA
+-- 🌙 NIGHT HUB - DUNGEON QUEST SPAMMER & TWEEN FARM
+-- INTERFACE ESTILO HOHO HUB - SPAMMER SIMPLES E FUNCIONAL
 -- =========================================================================
 
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
-   Name = "Dungeon Quest Hub | Xeno",
-   LoadingTitle = "Carregando o Hub...",
-   LoadingSubtitle = "Auto Farm & Spammer",
-   ConfigurationSaving = {
-      Enabled = false,
-      FolderName = nil,
-      FileName = "DQHub"
-   },
-   Discord = {
-      Enabled = false,
-      Invite = "noinvitelink",
-      RememberJoins = true
-   },
-   KeySystem = false,
-})
-
+-- Serviços
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 
-getgenv().SpammerAtivo = false
-getgenv().TweenFarmAtivo = false
-getgenv().NoVFXAtivo = false
-getgenv().TweenHeight = 5
-getgenv().TweenSpeed = 20
-getgenv().VelocidadeExtra = false
+-- Cores - Estilo Hoho Hub (Azul Claro + Cinzento)
+local Cores = {
+    Fundo = Color3.fromRGB(45, 45, 51),
+    Header = Color3.fromRGB(37, 37, 42),
+    TabsBg = Color3.fromRGB(53, 53, 59),
+    TabAtiva = Color3.fromRGB(79, 195, 247),    -- Azul claro Hoho
+    TabInativa = Color3.fromRGB(63, 63, 69),
+    Card = Color3.fromRGB(58, 58, 64),
+    Borda = Color3.fromRGB(79, 195, 247),
+    TextoPrimario = Color3.fromRGB(255, 255, 255),
+    TextoSecundario = Color3.fromRGB(170, 170, 170),
+    Destaque = Color3.fromRGB(79, 195, 247),     -- Azul claro Hoho
+    SwitchOn = Color3.fromRGB(79, 195, 247),      -- Azul claro Hoho
+    SwitchOff = Color3.fromRGB(102, 102, 107),
+    Fechar = Color3.fromRGB(255, 82, 82),
+    BindAzul = Color3.fromRGB(79, 195, 247),      -- Azul claro Hoho
+}
 
-local vfxConnection = nil
-local spamLoop = nil
-local farmLoop = nil
-local speedLoop = nil
-local originalWalkSpeed = 16
-local speedMultiplier = 1.3
+local NightHub = {
+    SpammerAtivo = false,
+    TweenFarmAtivo = false,
+    NoVFXAtivo = false,
+    VelocidadeExtra = true,
+    TweenHeight = 5,
+    TweenSpeed = 20,
+    SpeedMultiplier = 1.5,
+    OriginalWalkSpeed = 16,
+}
+
+local Binds = {
+    Spammer = "R",
+    Farm = "G",
+    NoVFX = "H",
+    Speed = "J",
+    ToggleUI = "K",
+}
+
+local Connections = {}
+local UIToggles = {}
+local UIHovered = false
 
 -- =========================================================================
--- OCULTAR SÓ HABILIDADES (NÃO MEXE NO MAPA)
+-- INTERFACE
 -- =========================================================================
-local function isHabilidade(nome: string)
-    nome = string.upper(nome)
-    local keywords = {
-        "PULSE", "LIGHTNING", "MAGIC", "EFFECT", "SPELL", "ATTACK",
-        "BOMB", "EXPLOSION", "BLAST", "FIRE", "ICE", "THUNDER",
-        "STORM", "WIND", "EARTH", "WATER", "SHADOW", "LIGHT",
-        "DARK", "HOLY", "DEMON", "DRAGON", "PHOENIX", "WOLF",
-        "SKILL", "POWER", "BURST", "SLASH", "CUT", "STAB",
-        "PIERCE", "CRUSH", "SMASH", "BEAM", "BALL", "WAVE",
-        "AURA", "FIELD", "ZONE", "CIRCLE", "RING", "ORB",
-        "PROJECTILE", "MISSILE", "LASER", "RAY", "BOLT",
-        "SHOCK", "FLAME", "FROST", "SPARK", "GLOW", "RADIANT"
-    }
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NightHub"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 560, 0, 490)
+MainFrame.Position = UDim2.new(0.5, -280, 0.5, -245)
+MainFrame.BackgroundColor3 = Cores.Fundo
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Cores.Borda
+MainStroke.Thickness = 2
+MainStroke.Transparency = 0.5
+MainStroke.Parent = MainFrame
+
+MainFrame.MouseEnter:Connect(function() UIHovered = true end)
+MainFrame.MouseLeave:Connect(function() UIHovered = false end)
+
+-- Header
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 55)
+Header.BackgroundColor3 = Cores.Header
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 10)
+HeaderCorner.Parent = Header
+
+local HeaderCover = Instance.new("Frame")
+HeaderCover.Size = UDim2.new(1, 0, 0, 12)
+HeaderCover.Position = UDim2.new(0, 0, 1, -12)
+HeaderCover.BackgroundColor3 = Cores.Header
+HeaderCover.BorderSizePixel = 0
+HeaderCover.Parent = Header
+
+local Logo = Instance.new("TextLabel")
+Logo.Size = UDim2.new(0, 35, 0, 35)
+Logo.Position = UDim2.new(0, 15, 0, 10)
+Logo.BackgroundTransparency = 1
+Logo.Text = "🌙"
+Logo.TextSize = 24
+Logo.Parent = Header
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(0, 200, 0, 25)
+TitleLabel.Position = UDim2.new(0, 55, 0, 8)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "NIGHT HUB"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 20
+TitleLabel.Font = Enum.Font.GothamBlack
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = Header
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 32, 0, 32)
+CloseButton.Position = UDim2.new(1, -42, 0, 12)
+CloseButton.BackgroundColor3 = Cores.Fechar
+CloseButton.Text = "✕"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 16
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Parent = Header
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui.Enabled = false
+end)
+
+-- Tabs
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(1, -10, 0, 42)
+TabContainer.Position = UDim2.new(0, 5, 0, 58)
+TabContainer.BackgroundColor3 = Cores.TabsBg
+TabContainer.BorderSizePixel = 0
+TabContainer.Parent = MainFrame
+
+local TabCorner = Instance.new("UICorner")
+TabCorner.CornerRadius = UDim.new(0, 8)
+TabCorner.Parent = TabContainer
+
+local UIListLayout_Tabs = Instance.new("UIListLayout")
+UIListLayout_Tabs.Padding = UDim.new(0, 2)
+UIListLayout_Tabs.FillDirection = Enum.FillDirection.Horizontal
+UIListLayout_Tabs.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout_Tabs.VerticalAlignment = Enum.VerticalAlignment.Center
+UIListLayout_Tabs.Parent = TabContainer
+
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, -16, 1, -108)
+ContentContainer.Position = UDim2.new(0, 8, 0, 104)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Parent = MainFrame
+
+local ContentPages = {}
+
+-- =========================================================================
+-- FUNÇÕES DA UI
+-- =========================================================================
+
+local function UpdateUIToggle(toggleName, state)
+    local toggleData = UIToggles[toggleName]
+    if not toggleData then return end
     
-    for _, keyword in ipairs(keywords) do
-        if string.match(nome, keyword) then
-            return true
-        end
-    end
-    return false
+    local targetColor = state and Cores.SwitchOn or Cores.SwitchOff
+    local targetPos = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    
+    TweenService:Create(toggleData.SwitchBg, TweenInfo.new(0.2), {
+        BackgroundColor3 = targetColor
+    }):Play()
+    
+    TweenService:Create(toggleData.SwitchKnob, TweenInfo.new(0.2), {
+        Position = targetPos
+    }):Play()
 end
 
-local function estaEmFerramenta(obj: Instance)
-    local current = obj
-    while current do
-        if current:IsA("Tool") then
-            return true
+local function CreateTab(name, icon)
+    local tabButton = Instance.new("TextButton")
+    tabButton.Size = UDim2.new(0, 165, 0, 34)
+    tabButton.BackgroundColor3 = Cores.TabInativa
+    tabButton.Text = icon .. "  " .. name
+    tabButton.TextColor3 = Cores.TextoSecundario
+    tabButton.TextSize = 13
+    tabButton.Font = Enum.Font.GothamSemibold
+    tabButton.Parent = TabContainer
+    
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 6)
+    tabCorner.Parent = tabButton
+    
+    local contentPage = Instance.new("ScrollingFrame")
+    contentPage.Size = UDim2.new(1, 0, 1, 0)
+    contentPage.BackgroundTransparency = 1
+    contentPage.BorderSizePixel = 0
+    contentPage.ScrollBarThickness = 3
+    contentPage.ScrollBarImageColor3 = Cores.Destaque
+    contentPage.Visible = false
+    contentPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+    contentPage.Parent = ContentContainer
+    
+    local pageLayout = Instance.new("UIListLayout")
+    pageLayout.Padding = UDim.new(0, 8)
+    pageLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    pageLayout.Parent = contentPage
+    
+    ContentPages[name] = { Button = tabButton, Page = contentPage }
+    
+    tabButton.MouseButton1Click:Connect(function()
+        for _, tab in pairs(ContentPages) do
+            tab.Page.Visible = false
+            tab.Button.BackgroundColor3 = Cores.TabInativa
+            tab.Button.TextColor3 = Cores.TextoSecundario
         end
-        current = current.Parent
-    end
-    return false
+        contentPage.Visible = true
+        tabButton.BackgroundColor3 = Cores.TabAtiva
+        tabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+    
+    return contentPage
 end
 
-local function ocultarHabilidade(obj: Instance)
-    if not getgenv().NoVFXAtivo then return end
+local function CreateSection(parent, title)
+    local sectionFrame = Instance.new("Frame")
+    sectionFrame.Size = UDim2.new(0.94, 0, 0, 26)
+    sectionFrame.BackgroundTransparency = 1
+    sectionFrame.Parent = parent
     
-    pcall(function()
-        -- SÓ OCULTA SE FOR HABILIDADE
-        local ehHabilidade = isHabilidade(obj.Name)
-        if not ehHabilidade and obj.Parent then
-            ehHabilidade = isHabilidade(obj.Parent.Name)
-        end
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(0, 3, 0, 14)
+    bar.Position = UDim2.new(0, 0, 0, 6)
+    bar.BackgroundColor3 = Cores.Destaque
+    bar.BorderSizePixel = 0
+    bar.Parent = sectionFrame
+    
+    local sectionLabel = Instance.new("TextLabel")
+    sectionLabel.Size = UDim2.new(1, -10, 1, 0)
+    sectionLabel.Position = UDim2.new(0, 10, 0, 0)
+    sectionLabel.BackgroundTransparency = 1
+    sectionLabel.Text = title
+    sectionLabel.TextColor3 = Cores.Destaque
+    sectionLabel.TextSize = 12
+    sectionLabel.Font = Enum.Font.GothamBlack
+    sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    sectionLabel.Parent = sectionFrame
+    
+    parent.CanvasSize += UDim2.new(0, 0, 0, 32)
+    return sectionFrame
+end
+
+local function CreateToggleWithBind(parent, name, default, bindDefault, toggleKey, callback, bindCallback)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(0.94, 0, 0, 48)
+    toggleFrame.BackgroundColor3 = Cores.Card
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.Parent = parent
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = toggleFrame
+    
+    local functionLabel = Instance.new("TextLabel")
+    functionLabel.Size = UDim2.new(0, 180, 0, 20)
+    functionLabel.Position = UDim2.new(0, 12, 0, 6)
+    functionLabel.BackgroundTransparency = 1
+    functionLabel.Text = name
+    functionLabel.TextColor3 = Cores.TextoPrimario
+    functionLabel.TextSize = 13
+    functionLabel.Font = Enum.Font.GothamBold
+    functionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    functionLabel.Parent = toggleFrame
+    
+    local controlsContainer = Instance.new("Frame")
+    controlsContainer.Size = UDim2.new(1, -24, 0, 20)
+    controlsContainer.Position = UDim2.new(0, 12, 0, 24)
+    controlsContainer.BackgroundTransparency = 1
+    controlsContainer.Parent = toggleFrame
+    
+    local switchBg = Instance.new("Frame")
+    switchBg.Size = UDim2.new(0, 38, 0, 20)
+    switchBg.Position = UDim2.new(0, 0, 0.5, -10)
+    switchBg.BackgroundColor3 = default and Cores.SwitchOn or Cores.SwitchOff
+    switchBg.BorderSizePixel = 0
+    switchBg.Parent = controlsContainer
+    
+    local switchCorner = Instance.new("UICorner")
+    switchCorner.CornerRadius = UDim.new(1, 0)
+    switchCorner.Parent = switchBg
+    
+    local switchKnob = Instance.new("Frame")
+    switchKnob.Size = UDim2.new(0, 16, 0, 16)
+    switchKnob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    switchKnob.BorderSizePixel = 0
+    switchKnob.Parent = switchBg
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = switchKnob
+    
+    UIToggles[toggleKey] = { SwitchBg = switchBg, SwitchKnob = switchKnob }
+    
+    local state = default
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 38, 0, 20)
+    toggleButton.Position = UDim2.new(0, 0, 0.5, -10)
+    toggleButton.BackgroundTransparency = 1
+    toggleButton.Text = ""
+    toggleButton.Parent = controlsContainer
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        state = not state
+        UpdateUIToggle(toggleKey, state)
+        callback(state)
+    end)
+    
+    local bindLabel = Instance.new("TextLabel")
+    bindLabel.Size = UDim2.new(0, 28, 0, 20)
+    bindLabel.Position = UDim2.new(1, -108, 0.5, -10)
+    bindLabel.BackgroundTransparency = 1
+    bindLabel.Text = "Tecla"
+    bindLabel.TextColor3 = Cores.TextoSecundario
+    bindLabel.TextSize = 10
+    bindLabel.Font = Enum.Font.GothamSemibold
+    bindLabel.TextXAlignment = Enum.TextXAlignment.Right
+    bindLabel.Parent = controlsContainer
+    
+    local bindButton = Instance.new("TextButton")
+    bindButton.Size = UDim2.new(0, 60, 0, 20)
+    bindButton.Position = UDim2.new(1, -75, 0.5, -10)
+    bindButton.BackgroundColor3 = Cores.BindAzul
+    bindButton.Text = bindDefault
+    bindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bindButton.TextSize = 11
+    bindButton.Font = Enum.Font.GothamBold
+    bindButton.Parent = controlsContainer
+    
+    local bindCorner = Instance.new("UICorner")
+    bindCorner.CornerRadius = UDim.new(0, 5)
+    bindCorner.Parent = bindButton
+    
+    local listening = false
+    
+    bindButton.MouseButton1Click:Connect(function()
+        listening = true
+        bindButton.Text = "..."
         
-        -- Verifica se está em uma ferramenta (habilidade)
-        local emFerramenta = estaEmFerramenta(obj)
-        
-        -- SÓ oculta se for habilidade OU estiver em ferramenta
-        if not ehHabilidade and not emFerramenta then
-            return
-        end
-        
-        -- OCULTA PARTÍCULAS (só de habilidades)
-        if obj:IsA("ParticleEmitter") then
-            obj.Enabled = false
-            obj.Rate = 0
-            return
-        end
-        
-        -- OCULTA TRAIL (rastro)
-        if obj:IsA("Trail") then
-            obj.Enabled = false
-            return
-        end
-        
-        -- OCULTA BEAM (feixe)
-        if obj:IsA("Beam") then
-            obj.Enabled = false
-            return
-        end
-        
-        -- OCULTA FOGO
-        if obj:IsA("Fire") then
-            obj.Enabled = false
-            obj.Size = 0
-            return
-        end
-        
-        -- OCULTA FUMAÇA
-        if obj:IsA("Smoke") then
-            obj.Enabled = false
-            return
-        end
-        
-        -- OCULTA CHISPAS
-        if obj:IsA("Sparkles") then
-            obj.Enabled = false
-            return
-        end
-        
-        -- OCULTA EXPLOSÕES (destrói)
-        if obj:IsA("Explosion") then
-            obj:Destroy()
-            return
-        end
-        
-        -- OCULTA LUZES (só de habilidades)
-        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
-            obj.Enabled = false
-            return
-        end
-        
-        -- OCULTA SONS (só de habilidades)
-        if obj:IsA("Sound") then
-            obj.Volume = 0
-            obj:Stop()
-            return
-        end
-        
-        -- OCULTA DECALS (só de habilidades)
-        if obj:IsA("Decal") or obj:IsA("Texture") then
-            if obj.Parent and isHabilidade(obj.Parent.Name) then
-                obj.Transparency = 1
+        local connection
+        connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if listening then
+                local keyName = nil
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    keyName = input.KeyCode.Name
+                elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    keyName = "Mouse1"
+                elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    keyName = "Mouse2"
+                end
+                
+                if keyName then
+                    listening = false
+                    connection:Disconnect()
+                    bindButton.Text = keyName
+                    bindCallback(keyName)
+                end
             end
-            return
-        end
-        
-        -- OCULTA PARTES (só se for claramente habilidade)
-        if obj:IsA("BasePart") then
-            -- Verifica se é uma parte de habilidade
-            local ehParteHabilidade = false
+        end)
+    end)
+    
+    parent.CanvasSize += UDim2.new(0, 0, 0, 54)
+    return toggleButton
+end
+
+local function CreateSlider(parent, name, min, max, default, callback)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(0.94, 0, 0, 60)
+    sliderFrame.BackgroundColor3 = Cores.Card
+    sliderFrame.BorderSizePixel = 0
+    sliderFrame.Parent = parent
+    
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 8)
+    sliderCorner.Parent = sliderFrame
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(1, -24, 0, 18)
+    valueLabel.Position = UDim2.new(0, 12, 0, 6)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = name .. ": " .. default
+    valueLabel.TextColor3 = Cores.TextoPrimario
+    valueLabel.TextSize = 13
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+    valueLabel.Parent = sliderFrame
+    
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, -24, 0, 5)
+    sliderBar.Position = UDim2.new(0, 12, 0, 32)
+    sliderBar.BackgroundColor3 = Cores.Fundo
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = sliderFrame
+    
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 3)
+    barCorner.Parent = sliderBar
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Cores.Destaque
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBar
+    
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 3)
+    fillCorner.Parent = sliderFill
+    
+    local sliderKnob = Instance.new("Frame")
+    sliderKnob.Size = UDim2.new(0, 14, 0, 14)
+    sliderKnob.Position = UDim2.new((default - min) / (max - min), -7, 0, -4)
+    sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderKnob.BorderSizePixel = 0
+    sliderKnob.Parent = sliderBar
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = sliderKnob
+    
+    local dragButton = Instance.new("TextButton")
+    dragButton.Size = UDim2.new(2, 0, 2, 0)
+    dragButton.Position = UDim2.new(-0.5, 0, -0.5, 0)
+    dragButton.BackgroundTransparency = 1
+    dragButton.Text = ""
+    dragButton.Parent = sliderKnob
+    
+    local dragging = false
+    
+    dragButton.MouseButton1Down:Connect(function() dragging = true end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mousePos = UserInputService:GetMouseLocation()
+            local barPos = sliderBar.AbsolutePosition
+            local barSize = sliderBar.AbsoluteSize
             
-            -- Nome é de habilidade
-            if isHabilidade(obj.Name) then
-                ehParteHabilidade = true
-            end
+            local percent = math.clamp((mousePos.X - barPos.X) / barSize.X, 0, 1)
+            local value = math.floor(min + (max - min) * percent)
             
-            -- Pai é de habilidade
-            if obj.Parent and isHabilidade(obj.Parent.Name) then
-                ehParteHabilidade = true
-            end
-            
-            -- Verifica características de habilidade
-            if obj.Transparency and obj.Transparency < 0.5 and obj.CanCollide == false and obj.Anchored then
-                ehParteHabilidade = true
-            end
-            
-            -- Está dentro de uma ferramenta
-            if emFerramenta then
-                ehParteHabilidade = true
-            end
-            
-            if ehParteHabilidade then
-                obj.Transparency = 1
-                obj.CanCollide = false
-                -- NÃO muda o material para não bugar o mapa
-            end
-            return
-        end
-        
-        -- OCULTA GUI (só de habilidades)
-        if obj:IsA("BillboardGui") or obj:IsA("ScreenGui") or obj:IsA("SurfaceGui") then
-            if isHabilidade(obj.Name) or (obj.Parent and isHabilidade(obj.Parent.Name)) then
-                obj.Enabled = false
-            end
-            return
-        end
-        
-        -- OCULTA MESHES (só de habilidades)
-        if obj:IsA("SpecialMesh") or obj:IsA("CylinderMesh") or obj:IsA("BlockMesh") then
-            if isHabilidade(obj.Name) or (obj.Parent and isHabilidade(obj.Parent.Name)) then
-                obj.Visible = false
-            end
-            return
+            sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+            sliderKnob.Position = UDim2.new(percent, -7, 0, -4)
+            valueLabel.Text = name .. ": " .. value
+            callback(value)
         end
     end)
+    
+    parent.CanvasSize += UDim2.new(0, 0, 0, 66)
+    return sliderBar
 end
 
 -- =========================================================================
--- SCANEAR E OCULTAR SÓ HABILIDADES
+-- PÁGINAS
 -- =========================================================================
-local function scanearOcultar()
-    if not getgenv().NoVFXAtivo then return end
+
+local CombatPage = CreateTab("Combate", "⚔️")
+CreateSection(CombatPage, "SPAM DE HABILIDADES")
+CreateToggleWithBind(CombatPage, "Spammer Automático", false, Binds.Spammer, "Spammer",
+    function(value)
+        NightHub.SpammerAtivo = value
+        if value then iniciarSpammer() else pararSpammer() end
+    end,
+    function(bind) Binds.Spammer = bind end
+)
+
+CreateSection(CombatPage, "OTIMIZAÇÃO")
+CreateToggleWithBind(CombatPage, "Velocidade Extra (1.5x)", true, Binds.Speed, "Speed",
+    function(value)
+        NightHub.VelocidadeExtra = value
+        if value then ativarVelocidadeExtra() else desativarVelocidadeExtra() end
+    end,
+    function(bind) Binds.Speed = bind end
+)
+
+CreateToggleWithBind(CombatPage, "Ocultar Efeitos Visuais", false, Binds.NoVFX, "NoVFX",
+    function(value)
+        NightHub.NoVFXAtivo = value
+        if value then ativarNoVFX() else desativarNoVFX() end
+    end,
+    function(bind) Binds.NoVFX = bind end
+)
+
+local FarmPage = CreateTab("Farm", "🎯")
+CreateSection(FarmPage, "AUTO FARM")
+CreateToggleWithBind(FarmPage, "Auto Farm Inteligente", false, Binds.Farm, "Farm",
+    function(value)
+        NightHub.TweenFarmAtivo = value
+        if value then iniciarFarm() else pararFarm() end
+    end,
+    function(bind) Binds.Farm = bind end
+)
+
+CreateSlider(FarmPage, "Altura de Voo", 0, 30, 5, function(value) NightHub.TweenHeight = value end)
+CreateSlider(FarmPage, "Velocidade de Voo", 5, 40, 20, function(value) NightHub.TweenSpeed = value end)
+
+local ConfigPage = CreateTab("Config", "⚙️")
+CreateSection(ConfigPage, "CONTROLES")
+CreateToggleWithBind(ConfigPage, "Mostrar/Ocultar Menu", true, Binds.ToggleUI, "ToggleUI",
+    function(value) end,
+    function(bind) Binds.ToggleUI = bind end
+)
+
+-- Ativar primeira tab
+if ContentPages["Combate"] then
+    ContentPages["Combate"].Page.Visible = true
+    ContentPages["Combate"].Button.BackgroundColor3 = Cores.TabAtiva
+    ContentPages["Combate"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+-- =========================================================================
+-- BINDS
+-- =========================================================================
+local function IsBindMatch(input, bindName)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        return input.KeyCode.Name == bindName
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        return bindName == "Mouse1"
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        return bindName == "Mouse2"
+    end
+    return false
+end
+
+Connections.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if IsBindMatch(input, Binds.ToggleUI) then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+        return
+    end
     
-    pcall(function()
-        -- Só escaneia objetos que podem ser habilidades
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            -- Pula objetos do mapa (chão, paredes, etc)
-            if obj:IsA("BasePart") and obj.Parent and obj.Parent:IsA("Model") then
-                -- Verifica se é parte do mapa ou cenário
-                local parentName = string.upper(obj.Parent.Name)
-                if string.match(parentName, "MAP") or string.match(parentName, "FLOOR") or 
-                   string.match(parentName, "WALL") or string.match(parentName, "GROUND") or
-                   string.match(parentName, "TERRAIN") then
-                    -- PULA (NÃO OCULTA O MAPA)
-                    continue
+    if UIHovered and ScreenGui.Enabled then return end
+    
+    if IsBindMatch(input, Binds.Spammer) then
+        NightHub.SpammerAtivo = not NightHub.SpammerAtivo
+        UpdateUIToggle("Spammer", NightHub.SpammerAtivo)
+        if NightHub.SpammerAtivo then iniciarSpammer() else pararSpammer() end
+    elseif IsBindMatch(input, Binds.Farm) then
+        NightHub.TweenFarmAtivo = not NightHub.TweenFarmAtivo
+        UpdateUIToggle("Farm", NightHub.TweenFarmAtivo)
+        if NightHub.TweenFarmAtivo then iniciarFarm() else pararFarm() end
+    elseif IsBindMatch(input, Binds.NoVFX) then
+        NightHub.NoVFXAtivo = not NightHub.NoVFXAtivo
+        UpdateUIToggle("NoVFX", NightHub.NoVFXAtivo)
+        if NightHub.NoVFXAtivo then ativarNoVFX() else desativarNoVFX() end
+    elseif IsBindMatch(input, Binds.Speed) then
+        NightHub.VelocidadeExtra = not NightHub.VelocidadeExtra
+        UpdateUIToggle("Speed", NightHub.VelocidadeExtra)
+        if NightHub.VelocidadeExtra then ativarVelocidadeExtra() else desativarVelocidadeExtra() end
+    end
+end)
+
+-- =========================================================================
+-- SPAMMER SIMPLES E FUNCIONAL
+-- =========================================================================
+function iniciarSpammer()
+    if Connections.SpamLoop then return end
+    
+    print("🔥 SPAMMER INICIADO!")
+    
+    Connections.SpamLoop = RunService.Heartbeat:Connect(function()
+        if not NightHub.SpammerAtivo then return end
+        
+        pcall(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            
+            -- Pega TODAS as ferramentas (equipadas E mochila)
+            local tools = {}
+            
+            -- Equipadas
+            for _, v in ipairs(char:GetChildren()) do
+                if v:IsA("Tool") then table.insert(tools, v) end
+            end
+            
+            -- Mochila
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if bp then
+                for _, v in ipairs(bp:GetChildren()) do
+                    if v:IsA("Tool") then table.insert(tools, v) end
                 end
             end
             
-            -- Só oculta se for habilidade
-            ocultarHabilidade(obj)
-        end
-        
-        -- NÃO MEXE NO LIGHTING (não oculta efeitos de pós-processamento)
-    end)
-end
-
--- =========================================================================
--- ABA: COMBATE (SPAMMER)
--- =========================================================================
-local CombatTab = Window:CreateTab("Combate", 4483345998)
-local CombatSection = CombatTab:CreateSection("Auto Cast Sem Cooldown")
-
-CombatTab:CreateToggle({
-   Name = "Spam TODAS as Habilidades",
-   CurrentValue = false,
-   Flag = "SpamToggle", 
-   Callback = function(Value)
-        getgenv().SpammerAtivo = Value
-        if Value then
-            iniciarSpammer()
-        else
-            pararSpammer()
-        end
-   end,
-})
-
-CombatTab:CreateToggle({
-   Name = "Ocultar Efeitos e Som (Mais FPS)",
-   CurrentValue = false,
-   Flag = "NoVFXToggle", 
-   Callback = function(Value)
-        getgenv().NoVFXAtivo = Value
-        
-        if Value then
-            -- Oculta habilidades existentes
-            scanearOcultar()
-            
-            -- Conecta para novas habilidades
-            if not vfxConnection then
-                vfxConnection = workspace.DescendantAdded:Connect(function(obj)
-                    task.wait(0.01)
-                    -- Só processa se for habilidade
-                    if isHabilidade(obj.Name) or estaEmFerramenta(obj) then
-                        ocultarHabilidade(obj)
-                        -- Oculta os filhos também
-                        for _, child in ipairs(obj:GetDescendants()) do
-                            ocultarHabilidade(child)
+            -- Ativa TODAS
+            for _, tool in ipairs(tools) do
+                pcall(function()
+                    tool:Activate()
+                    
+                    -- Remotes
+                    for _, d in ipairs(tool:GetDescendants()) do
+                        if d:IsA("RemoteEvent") then
+                            pcall(function()
+                                d:FireServer()
+                            end)
                         end
                     end
                 end)
             end
-        else
-            if vfxConnection then
-                vfxConnection:Disconnect()
-                vfxConnection = nil
-            end
-        end
-   end,
-})
-
-CombatTab:CreateToggle({
-   Name = "Velocidade Extra (1.3x Seguro)",
-   CurrentValue = false,
-   Flag = "SpeedToggle",
-   Callback = function(Value)
-        getgenv().VelocidadeExtra = Value
-        if Value then
-            ativarVelocidadeExtra()
-        else
-            desativarVelocidadeExtra()
-        end
-   end,
-})
-
--- =========================================================================
--- ABA: AUTO FARM (TWEEN)
--- =========================================================================
-local FarmTab = Window:CreateTab("Auto Farm", 4483345998)
-local FarmSection = FarmTab:CreateSection("Tween Farm Inteligente")
-
-FarmTab:CreateToggle({
-   Name = "Ligar Tween Farm",
-   CurrentValue = false,
-   Flag = "FarmToggle", 
-   Callback = function(Value)
-        getgenv().TweenFarmAtivo = Value
-        if Value then
-            iniciarFarm()
-        else
-            pararFarm()
-        end
-   end,
-})
-
-FarmTab:CreateSlider({
-   Name = "Altura do Voo (acima do NPC)",
-   Range = {0, 30},
-   Increment = 1,
-   Suffix = " Studs",
-   CurrentValue = 5,
-   Flag = "HeightSlider",
-   Callback = function(Value)
-        getgenv().TweenHeight = Value
-   end,
-})
-
-FarmTab:CreateSlider({
-   Name = "Velocidade do Voo",
-   Range = {5, 40},
-   Increment = 1,
-   Suffix = " Speed",
-   CurrentValue = 20,
-   Flag = "SpeedSlider",
-   Callback = function(Value)
-        getgenv().TweenSpeed = Value
-   end,
-})
-
--- =========================================================================
--- VELOCIDADE EXTRA
--- =========================================================================
-function ativarVelocidadeExtra()
-    if speedLoop then return end
-    
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        originalWalkSpeed = char.Humanoid.WalkSpeed
-    end
-    
-    speedLoop = RunService.Heartbeat:Connect(function()
-        if not getgenv().VelocidadeExtra then
-            desativarVelocidadeExtra()
-            return
-        end
-        
-        pcall(function()
-            local char = LocalPlayer.Character
-            if not char then return end
-            
-            local humanoid = char:FindFirstChild("Humanoid")
-            if humanoid then
-                local targetSpeed = originalWalkSpeed * speedMultiplier
-                if targetSpeed > 25 then targetSpeed = 25 end
-                if humanoid.WalkSpeed ~= targetSpeed then
-                    humanoid.WalkSpeed = targetSpeed
-                end
-            end
         end)
     end)
-end
-
-function desativarVelocidadeExtra()
-    if speedLoop then
-        speedLoop:Disconnect()
-        speedLoop = nil
-    end
     
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = originalWalkSpeed
-    end
-end
-
--- =========================================================================
--- SPAMMER COM SPAM DUPLO (MESMO BOTÃO)
--- =========================================================================
-local function spamRemotes(parentFolder)
-    if not parentFolder then return end
-    
-    for _, item in ipairs(parentFolder:GetChildren()) do
-        if item:IsA("Tool") then
-            -- Pega TODOS os remotes
-            local remotes = {}
-            for _, obj in ipairs(item:GetDescendants()) do
-                if obj:IsA("RemoteEvent") then
-                    table.insert(remotes, obj)
-                end
-            end
-            
-            -- Spama TODOS os remotes (duplo automático)
-            for _, remote in ipairs(remotes) do
-                pcall(function()
-                    local mousePos = LocalPlayer:GetMouse().Hit.Position
-                    remote:FireServer(mousePos)
-                    remote:FireServer(item.Name, mousePos)
-                    remote:FireServer(mousePos, item.Name)
-                end)
-            end
-        end
-    end
-end
-
-function iniciarSpammer()
-    if spamLoop then return end
-    
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        originalWalkSpeed = char.Humanoid.WalkSpeed
-    end
-    
-    spamLoop = RunService.Stepped:Connect(function()
-        if not getgenv().SpammerAtivo then 
-            pararSpammer()
-            return 
-        end
-        
-        pcall(function()
-            local char = LocalPlayer.Character
-            if not char then return end
-            
-            local humanoid = char:FindFirstChild("Humanoid")
-            if humanoid and getgenv().VelocidadeExtra then
-                local targetSpeed = originalWalkSpeed * speedMultiplier
-                if targetSpeed > 25 then targetSpeed = 25 end
-                if humanoid.WalkSpeed ~= targetSpeed then
-                    humanoid.WalkSpeed = targetSpeed
-                end
-            end
-            
-            -- Spam em TODOS os remotes (duplo automático)
-            spamRemotes(char)
-            spamRemotes(LocalPlayer:FindFirstChild("Backpack"))
-            
-            -- Ativa TODAS as ferramentas (duplo automático)
-            for _, tool in ipairs(char:GetChildren()) do
-                if tool:IsA("Tool") then
-                    pcall(function()
-                        tool:Activate()
-                        -- Ativa 2x para garantir (spam duplo no mesmo botão)
-                        tool:Activate()
-                    end)
-                end
-            end
-            
-            preventKick()
-        end)
-    end)
+    print("✅ Spammer rodando!")
 end
 
 function pararSpammer()
-    if spamLoop then
-        spamLoop:Disconnect()
-        spamLoop = nil
-    end
-    
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        if getgenv().VelocidadeExtra then
-            local targetSpeed = originalWalkSpeed * speedMultiplier
-            if targetSpeed > 25 then targetSpeed = 25 end
-            char.Humanoid.WalkSpeed = targetSpeed
-        else
-            char.Humanoid.WalkSpeed = originalWalkSpeed
-        end
+    if Connections.SpamLoop then
+        Connections.SpamLoop:Disconnect()
+        Connections.SpamLoop = nil
+        print("❌ Spammer parado")
     end
 end
 
 -- =========================================================================
--- TWEEN FARM
+-- FARM
 -- =========================================================================
 local function getClosestEnemy()
-    local closest = nil
-    local shortestDist = math.huge
+    local closest, shortestDist = nil, math.huge
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
     local myPos = char.HumanoidRootPart.Position
@@ -509,13 +646,9 @@ local function getClosestEnemy()
         if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj.Name ~= LocalPlayer.Name then
             local hum = obj:FindFirstChild("Humanoid")
             local hrp = obj:FindFirstChild("HumanoidRootPart")
-            
             if hum and hrp and hum.Health > 0 then
                 local dist = (hrp.Position - myPos).Magnitude
-                if dist < shortestDist then
-                    shortestDist = dist
-                    closest = obj
-                end
+                if dist < shortestDist then shortestDist = dist; closest = obj end
             end
         end
     end
@@ -523,81 +656,24 @@ local function getClosestEnemy()
 end
 
 function iniciarFarm()
-    if farmLoop then return end
-    
-    farmLoop = RunService.Stepped:Connect(function()
-        if not getgenv().TweenFarmAtivo then 
-            pararFarm()
-            return 
-        end
-        
+    if Connections.FarmLoop then return end
+    Connections.FarmLoop = RunService.Heartbeat:Connect(function()
+        if not NightHub.TweenFarmAtivo then return end
         pcall(function()
             local char = LocalPlayer.Character
             if not char or not char:FindFirstChild("HumanoidRootPart") then return end
             local hrp = char.HumanoidRootPart
-            local humanoid = char:FindFirstChild("Humanoid")
-            
-            if humanoid then
-                humanoid.AutoRotate = true
-                humanoid.Sit = false
-                humanoid.PlatformStand = false
-                
-                if getgenv().VelocidadeExtra then
-                    local targetSpeed = originalWalkSpeed * speedMultiplier
-                    if targetSpeed > 25 then targetSpeed = 25 end
-                    humanoid.WalkSpeed = targetSpeed
+            local target = getClosestEnemy()
+            if target and target:FindFirstChild("HumanoidRootPart") then
+                local th = target.HumanoidRootPart
+                local dest = Vector3.new(th.Position.x, th.Position.y + NightHub.TweenHeight, th.Position.z)
+                local dir = (dest - hrp.Position).Unit
+                local dist = (dest - hrp.Position).Magnitude
+                if dist > 0.5 then
+                    hrp.Position = hrp.Position + dir * math.min(NightHub.TweenSpeed * 0.3, dist)
                 end
-            end
-            
-            local targetEnemy = getClosestEnemy()
-            
-            if targetEnemy and targetEnemy:FindFirstChild("HumanoidRootPart") then
-                local targetHrp = targetEnemy.HumanoidRootPart
-                local targetHum = targetEnemy:FindFirstChild("Humanoid")
-                
-                if targetHum and targetHum.Health > 0 then
-                    local destPosition = Vector3.new(
-                        targetHrp.Position.x,
-                        targetHrp.Position.y + getgenv().TweenHeight,
-                        targetHrp.Position.z
-                    )
-                    
-                    local currentPos = hrp.Position
-                    local direction = Vector3.new(
-                        destPosition.x - currentPos.x,
-                        0,
-                        destPosition.z - currentPos.z
-                    )
-                    
-                    local distance = direction.Magnitude
-                    
-                    if distance > 0.5 then
-                        local moveSpeed = getgenv().TweenSpeed * 0.3
-                        local moveAmount = math.min(moveSpeed, distance)
-                        local newPos = currentPos + direction.Unit * moveAmount
-                        newPos = Vector3.new(newPos.x, destPosition.y, newPos.z)
-                        hrp.Position = newPos
-                    else
-                        hrp.Position = destPosition
-                    end
-                    
-                    local lookTarget = Vector3.new(targetHrp.Position.x, hrp.Position.y, targetHrp.Position.z)
-                    hrp.CFrame = CFrame.new(hrp.Position, lookTarget)
-                    
-                    -- Spam duplo durante farm
-                    spamRemotes(char)
-                    spamRemotes(LocalPlayer:FindFirstChild("Backpack"))
-                    
-                    for _, tool in ipairs(char:GetChildren()) do
-                        if tool:IsA("Tool") then
-                            pcall(function()
-                                tool:Activate()
-                                tool:Activate() -- Duplo
-                            end)
-                        end
-                    end
-                    
-                    preventKick()
+                for _, t in ipairs(char:GetChildren()) do
+                    if t:IsA("Tool") then pcall(function() t:Activate() end) end
                 end
             end
         end)
@@ -605,92 +681,90 @@ function iniciarFarm()
 end
 
 function pararFarm()
-    if farmLoop then
-        farmLoop:Disconnect()
-        farmLoop = nil
-    end
-    
-    local char = LocalPlayer.Character
-    if char then
-        local humanoid = char:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.PlatformStand = false
-            humanoid.AutoRotate = true
-            humanoid.Sit = false
-            
-            if getgenv().VelocidadeExtra then
-                local targetSpeed = originalWalkSpeed * speedMultiplier
-                if targetSpeed > 25 then targetSpeed = 25 end
-                humanoid.WalkSpeed = targetSpeed
-            else
-                humanoid.WalkSpeed = originalWalkSpeed
-            end
-        end
-    end
+    if Connections.FarmLoop then Connections.FarmLoop:Disconnect(); Connections.FarmLoop = nil end
 end
 
--- =========================================================================
--- SISTEMA DE SEGURANÇA
--- =========================================================================
-local function preventKick()
+-- NoVFX
+local function isHabilidade(nome)
+    nome = string.upper(nome)
+    for _, k in ipairs({"PULSE","LIGHTNING","MAGIC","EFFECT","SPELL","ATTACK","BOMB","EXPLOSION","BLAST","FIRE","ICE","THUNDER","STORM","WIND","EARTH","WATER","SHADOW","LIGHT","DARK","HOLY","DEMON","DRAGON","PHOENIX","WOLF","SKILL","POWER","BURST","SLASH","CUT","STAB"}) do
+        if string.match(nome, k) then return true end
+    end
+    return false
+end
+
+function ativarNoVFX()
+    Connections.VFX = workspace.DescendantAdded:Connect(function(obj)
+        if not NightHub.NoVFXAtivo then return end
+        pcall(function()
+            if isHabilidade(obj.Name) or (obj.Parent and isHabilidade(obj.Parent.Name)) then
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") then obj.Enabled = false
+                elseif obj:IsA("Sound") then obj.Volume = 0 end
+            end
+        end)
+    end)
+end
+
+function desativarNoVFX()
+    if Connections.VFX then Connections.VFX:Disconnect(); Connections.VFX = nil end
+end
+
+-- Velocidade
+function ativarVelocidadeExtra()
+    if Connections.SpeedLoop then Connections.SpeedLoop:Disconnect() end
+    Connections.SpeedLoop = RunService.Heartbeat:Connect(function()
+        if not NightHub.VelocidadeExtra then return end
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                local speed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
+                if speed > 25 then speed = 25 end
+                char.Humanoid.WalkSpeed = speed
+            end
+        end)
+    end)
+end
+
+function desativarVelocidadeExtra()
+    if Connections.SpeedLoop then Connections.SpeedLoop:Disconnect(); Connections.SpeedLoop = nil end
     pcall(function()
         local char = LocalPlayer.Character
-        if char then
-            local humanoid = char:FindFirstChild("Humanoid")
-            if humanoid then
-                if getgenv().VelocidadeExtra then
-                    local safeSpeed = originalWalkSpeed * 1.3
-                    if safeSpeed > 25 then safeSpeed = 25 end
-                    if humanoid.WalkSpeed > safeSpeed then
-                        humanoid.WalkSpeed = safeSpeed
-                    end
-                end
-            end
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = NightHub.OriginalWalkSpeed
         end
     end)
 end
 
-task.spawn(function()
-    while task.wait(1) do
-        pcall(function()
-            preventKick()
-            
-            if not LocalPlayer or not LocalPlayer.Parent then
-                print("⚠️ Desconectado! Reconectando...")
-                TeleportService:Teleport(game.PlaceId)
-            end
-        end)
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    pcall(preventKick)
-end)
-
+-- Segurança - Garantir que ao renascer a velocidade volta ao normal se toggle estiver desligado
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
-    local humanoid = char:FindFirstChild("Humanoid")
-    if humanoid then
-        originalWalkSpeed = humanoid.WalkSpeed
-        humanoid.AutoRotate = true
-        humanoid.Sit = false
-        humanoid.PlatformStand = false
+    if char:FindFirstChild("Humanoid") then
+        -- Guarda o walk speed original do jogo
+        NightHub.OriginalWalkSpeed = char.Humanoid.WalkSpeed
         
-        if getgenv().VelocidadeExtra then
-            local targetSpeed = originalWalkSpeed * speedMultiplier
-            if targetSpeed > 25 then targetSpeed = 25 end
-            humanoid.WalkSpeed = targetSpeed
+        task.wait(0.2)
+        -- Só aplica velocidade extra se o toggle estiver ativo
+        if NightHub.VelocidadeExtra then
+            local speed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
+            if speed > 25 then speed = 25 end
+            char.Humanoid.WalkSpeed = speed
+        else
+            -- Garante que volta ao valor padrão do jogo
+            char.Humanoid.WalkSpeed = NightHub.OriginalWalkSpeed
         end
     end
 end)
 
--- =========================================================================
--- SCAN PERIÓDICO (SÓ HABILIDADES)
--- =========================================================================
+-- Init
 task.spawn(function()
-    while task.wait(3) do
-        if getgenv().NoVFXAtivo then
-            scanearOcultar()
-        end
+    while not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") do task.wait(0.5) end
+    NightHub.OriginalWalkSpeed = LocalPlayer.Character.Humanoid.WalkSpeed
+    
+    -- Só ativa velocidade se o toggle estiver ligado
+    if NightHub.VelocidadeExtra then
+        ativarVelocidadeExtra()
     end
 end)
+
+print("🌙 Night Hub pronto!")
+print("🔥 R = Spammer | K = Menu | ⚡ 1.5x")
