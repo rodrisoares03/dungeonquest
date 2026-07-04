@@ -1,7 +1,7 @@
 --!strict
 -- =========================================================================
--- NIGHT HUB - DUNGEON QUEST SPAMMER & TWEEN FARM
--- INTERFACE ESTILO HOHO HUB - SPAMMER SIMPLES E FUNCIONAL
+-- NIGHT HUB - DUNGEON QUEST SPAMMER & VOID-STALKER FARM
+-- COM FLY MANUAL, FARM INTELIGENTE, PROFILE, CONFIGS E AUTO SELL
 -- =========================================================================
 
 -- Serviços
@@ -12,9 +12,8 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Stats = game:GetService("Stats")
 
--- Cores - Estilo Hoho Hub (Azul Claro + Cinzento)
+-- Cores
 local Cores = {
     Fundo = Color3.fromRGB(54, 54, 60),
     Header = Color3.fromRGB(83, 165, 235),
@@ -22,49 +21,83 @@ local Cores = {
     TabAtiva = Color3.fromRGB(92, 176, 248),
     TabInativa = Color3.fromRGB(70, 70, 76),
     Card = Color3.fromRGB(63, 63, 70),
-    Borda = Color3.fromRGB(229, 234, 240),
     TextoPrimario = Color3.fromRGB(248, 248, 250),
     TextoSecundario = Color3.fromRGB(192, 196, 206),
     Destaque = Color3.fromRGB(92, 176, 248),
     SwitchOn = Color3.fromRGB(92, 176, 248),
     SwitchOff = Color3.fromRGB(100, 102, 108),
-    Fechar = Color3.fromRGB(68, 68, 74),
-    BindAzul = Color3.fromRGB(92, 176, 248),
     StartGreen = Color3.fromRGB(76, 175, 80),
-    RoxoTitulo = Color3.fromRGB(138, 43, 226),
-    LaranjaHoho = Color3.fromRGB(246, 166, 38),
+    BindAzul = Color3.fromRGB(92, 176, 248),
+    -- Cores de raridade para a aba Sell
+    Legendary = Color3.fromRGB(255, 165, 0),
+    Epic = Color3.fromRGB(163, 73, 255),
+    Rare = Color3.fromRGB(0, 112, 221),
+    Uncommon = Color3.fromRGB(30, 180, 80),
+    Ultimate = Color3.fromRGB(255, 0, 255), -- Magenta/Pink para Ultimate
+    Common = Color3.fromRGB(160, 160, 160),
+    SellRed = Color3.fromRGB(220, 50, 50),
 }
 
 local NightHub = {
     SpammerAtivo = false,
-    TweenFarmAtivo = false,
+    FarmAtivo = false,
+    FlyAtivo = false,
     NoVFXAtivo = false,
     VelocidadeExtra = true,
-    TweenHeight = 5,
-    TweenSpeed = 20,
     SpeedMultiplier = 1.5,
     OriginalWalkSpeed = 16,
     DungeonStartCount = 0,
     OcultarNome = false,
     NomePersonalizado = "",
+    -- Configs do Void-Stalker Farm
+    FlightSpeed = 27,
+    FixedDepth = -15,
+    MaxDetectionRange = 500,
+    HitboxSize = 115,
+    -- AutoSell
+    AutoSellAtivo = false,
+    AutoRetryAtivo = false,
+}
+
+-- =========================================================================
+-- CONFIGURAÇÕES DO AUTO SELL
+-- =========================================================================
+local AutoSellSettings = {
+    ["weapon"]  = {["ultimate"] = false, ["legendary"] = false, ["epic"] = true,  ["rare"] = true,  ["uncommon"] = true,  ["common"] = true},
+    ["chest"]   = {["epic"] = false,      ["rare"] = true,  ["uncommon"] = true,  ["common"] = true},
+    ["helmet"]  = {["epic"] = false,      ["rare"] = true,  ["uncommon"] = true,  ["common"] = true},
+    ["ability"] = {["legendary"] = false, ["epic"] = false,      ["rare"] = true,  ["uncommon"] = true,  ["common"] = true},
+    ["ring"]    = {["epic"] = false,      ["rare"] = false, ["uncommon"] = false, ["common"] = false},
 }
 
 local Binds = {
     Spammer = "R",
     Farm = "G",
+    Fly = "F",
     NoVFX = "H",
     Speed = "J",
     ToggleUI = "K",
-    StartDungeon = "F",
+    StartDungeon = "L",
 }
 
 local HttpService = game:GetService("HttpService")
 local configsFileName = "NightHub_Configs_" .. LocalPlayer.Name .. ".json"
 
--- Tabela de configs nomeadas em memória: { ["Nome"] = { dados... } }
-local SavedConfigs = {}
+-- Config system moved to end
+local Connections = {}
+local UIToggles = {}
+local UIHovered = false
+local ContentPages = {}
 
-local function getAllConfigs()
+-- =========================================================================
+
+-- Forward Declarations
+local UpdateUIToggle, CreateTab, CreateSection, CreateToggleWithBind, CreateSlider, CreateTextBox, CreateDungeonButton, CreateAutoRetryToggle
+local iniciarSpammer, pararSpammer, iniciarFly, pararFly, iniciarFarm, pararFarm, ativarNoVFX, desativarNoVFX, ativarVelocidadeExtra, desativarVelocidadeExtra
+local applyToTextLabel, refreshAllTextLabels, iniciarNameChanger, atualizarBotaoRaridade, showFeedback, rebuildConfigList
+local getAllConfigs, writeAllConfigs, getCurrentSnapshot, applySnapshot
+
+function getAllConfigs()
     local ok, exists = pcall(isfile, configsFileName)
     if not ok or not exists then return {} end
     local ok2, content = pcall(readfile, configsFileName)
@@ -74,23 +107,32 @@ local function getAllConfigs()
     return data
 end
 
-local function writeAllConfigs(tbl)
+function writeAllConfigs(tbl)
     local ok, str = pcall(function() return HttpService:JSONEncode(tbl) end)
     if ok then pcall(writefile, configsFileName, str) end
 end
 
-local function getCurrentSnapshot()
+function getCurrentSnapshot()
     return {
         OcultarNome = NightHub.OcultarNome,
         NomePersonalizado = NightHub.NomePersonalizado,
-        TweenHeight = NightHub.TweenHeight,
-        TweenSpeed = NightHub.TweenSpeed,
         SpeedMultiplier = NightHub.SpeedMultiplier,
         VelocidadeExtra = NightHub.VelocidadeExtra,
         NoVFXAtivo = NightHub.NoVFXAtivo,
+        FlightSpeed = NightHub.FlightSpeed,
+        FixedDepth = NightHub.FixedDepth,
+        MaxDetectionRange = NightHub.MaxDetectionRange,
+        HitboxSize = NightHub.HitboxSize,
+        AutoSellSettings = AutoSellSettings,
+        AutoSellAtivo = NightHub.AutoSellAtivo,
+        AutoRetryAtivo = NightHub.AutoRetryAtivo,
+        SpammerAtivo = NightHub.SpammerAtivo,
+        FarmAtivo = NightHub.FarmAtivo,
+        FlyAtivo = NightHub.FlyAtivo,
         Binds = {
             Spammer = Binds.Spammer,
             Farm = Binds.Farm,
+            Fly = Binds.Fly,
             NoVFX = Binds.NoVFX,
             Speed = Binds.Speed,
             ToggleUI = Binds.ToggleUI,
@@ -99,30 +141,95 @@ local function getCurrentSnapshot()
     }
 end
 
-local function applySnapshot(data)
+function applySnapshot(data)
     if type(data) ~= "table" then return end
+    
+    -- Primeiro as variáveis de dados
     if data.OcultarNome ~= nil then NightHub.OcultarNome = data.OcultarNome end
     if data.NomePersonalizado ~= nil then NightHub.NomePersonalizado = data.NomePersonalizado end
-    if data.TweenHeight ~= nil then NightHub.TweenHeight = data.TweenHeight end
-    if data.TweenSpeed ~= nil then NightHub.TweenSpeed = data.TweenSpeed end
     if data.SpeedMultiplier ~= nil then NightHub.SpeedMultiplier = data.SpeedMultiplier end
     if data.VelocidadeExtra ~= nil then NightHub.VelocidadeExtra = data.VelocidadeExtra end
     if data.NoVFXAtivo ~= nil then NightHub.NoVFXAtivo = data.NoVFXAtivo end
+    if data.FlightSpeed ~= nil then NightHub.FlightSpeed = data.FlightSpeed end
+    if data.FixedDepth ~= nil then NightHub.FixedDepth = data.FixedDepth end
+    if data.MaxDetectionRange ~= nil then NightHub.MaxDetectionRange = data.MaxDetectionRange end
+    if data.HitboxSize ~= nil then NightHub.HitboxSize = data.HitboxSize end
+    
+    if type(data.AutoSellSettings) == "table" then
+        for cat, rarities in pairs(data.AutoSellSettings) do
+            if AutoSellSettings[cat] then
+                for rar, val in pairs(rarities) do
+                    if AutoSellSettings[cat][rar] ~= nil then
+                        AutoSellSettings[cat][rar] = val
+                    end
+                end
+            end
+        end
+    end
+
     if type(data.Binds) == "table" then
         for k, v in pairs(data.Binds) do
             if Binds[k] ~= nil then Binds[k] = v end
         end
     end
+
+    -- Aplicar estados de toggle
+    if data.SpammerAtivo ~= nil then
+        NightHub.SpammerAtivo = data.SpammerAtivo
+        UpdateUIToggle("Spammer", NightHub.SpammerAtivo)
+        if NightHub.SpammerAtivo then pcall(iniciarSpammer) else pcall(pararSpammer) end
+    end
+    if data.FarmAtivo ~= nil then
+        NightHub.FarmAtivo = data.FarmAtivo
+        UpdateUIToggle("Farm", NightHub.FarmAtivo)
+        if NightHub.FarmAtivo then pcall(iniciarFarm) else pcall(pararFarm) end
+    end
+    if data.FlyAtivo ~= nil then
+        NightHub.FlyAtivo = data.FlyAtivo
+        UpdateUIToggle("Fly", NightHub.FlyAtivo)
+        if NightHub.FlyAtivo then pcall(iniciarFly) else pcall(pararFly) end
+    end
+    if data.AutoSellAtivo ~= nil then
+        NightHub.AutoSellAtivo = data.AutoSellAtivo
+        UpdateUIToggle("AutoSell", NightHub.AutoSellAtivo)
+        if NightHub.AutoSellAtivo then
+            pcall(function()
+                local autoSell = loadstring(game:HttpGet('https://raw.githubusercontent.com/ValorantIsKewl/RBX/refs/heads/main/DQautoSell.lua'))()
+                autoSell(AutoSellSettings)
+            end)
+        end
+    end
+    if data.AutoRetryAtivo ~= nil then
+        NightHub.AutoRetryAtivo = data.AutoRetryAtivo
+        UpdateUIToggle("AutoRetry", NightHub.AutoRetryAtivo)
+        if NightHub.AutoRetryAtivo then
+            pcall(function()
+                loadstring(game:HttpGet('https://raw.githubusercontent.com/ValorantIsKewl/RBX/refs/heads/main/DQAutoRetry'))()
+            end)
+        end
+    end
+    if data.NoVFXAtivo ~= nil then
+        UpdateUIToggle("NoVFX", data.NoVFXAtivo)
+        if data.NoVFXAtivo then pcall(ativarNoVFX) else pcall(desativarNoVFX) end
+    end
+    if data.VelocidadeExtra ~= nil then
+        UpdateUIToggle("Speed", data.VelocidadeExtra)
+        if data.VelocidadeExtra then pcall(ativarVelocidadeExtra) else pcall(desativarVelocidadeExtra) end
+    end
+    
+    -- Atualiza visual dos botões de raridade na aba Sell
+    for catKey, _ in pairs(AutoSellSettings) do
+        for rarKey, _ in pairs(AutoSellSettings[catKey]) do
+            atualizarBotaoRaridade(catKey, rarKey)
+        end
+    end
+    
+    refreshAllTextLabels()
 end
 
-SavedConfigs = getAllConfigs()
+local SavedConfigs = getAllConfigs()
 
-local Connections = {}
-local UIToggles = {}
-local UIHovered = false
-local ContentPages = {}
-
--- =========================================================================
+-- Configuração dos botões de Save/Load na aba Config
 -- INTERFACE
 -- =========================================================================
 
@@ -134,8 +241,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 520, 0, 392)
-MainFrame.Position = UDim2.new(0.5, -260, 0.5, -196)
+MainFrame.Size = UDim2.new(0, 520, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -260, 0.5, -225)
 MainFrame.BackgroundColor3 = Cores.Fundo
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
@@ -174,7 +281,7 @@ HeaderCover.BorderSizePixel = 0
 HeaderCover.Parent = Header
 
 local Logo = Instance.new("TextLabel")
-Logo.Size = UDim2.new(0, 250, 1, 0)
+Logo.Size = UDim2.new(0, 280, 1, 0)
 Logo.Position = UDim2.new(0, 10, 0, 0)
 Logo.BackgroundTransparency = 1
 Logo.RichText = true
@@ -185,39 +292,15 @@ Logo.Font = Enum.Font.GothamSemibold
 Logo.TextXAlignment = Enum.TextXAlignment.Left
 Logo.Parent = Header
 
-local GearButton = Instance.new("TextButton")
-GearButton.Size = UDim2.new(0, 24, 0, 24)
-GearButton.Position = UDim2.new(1, -58, 0, 2)
-GearButton.BackgroundTransparency = 1
-GearButton.Text = "⚙"
-GearButton.TextColor3 = Color3.fromRGB(15, 24, 32)
-GearButton.TextSize = 16
-GearButton.Font = Enum.Font.GothamBold
-GearButton.Parent = Header
-
-local MinButton = Instance.new("TextButton")
-MinButton.Size = UDim2.new(0, 24, 0, 24)
-MinButton.Position = UDim2.new(1, -30, 0, 2)
-MinButton.BackgroundTransparency = 1
-MinButton.Text = "-"
-MinButton.TextColor3 = Color3.fromRGB(15, 24, 32)
-MinButton.TextSize = 18
-MinButton.Font = Enum.Font.GothamBold
-MinButton.Parent = Header
-
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 24, 0, 24)
-CloseButton.Position = UDim2.new(1, -86, 0, 2)
+CloseButton.Position = UDim2.new(1, -30, 0, 2)
 CloseButton.BackgroundTransparency = 1
 CloseButton.Text = ""
 CloseButton.Parent = Header
 
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
-end)
-
-MinButton.MouseButton1Click:Connect(function()
-    ScreenGui.Enabled = false
 end)
 
 -- Tabs
@@ -256,7 +339,7 @@ ContentContainer.Parent = MainFrame
 -- FUNCOES DA UI
 -- =========================================================================
 
-local function UpdateUIToggle(toggleKey, state)
+function UpdateUIToggle(toggleKey, state)
     local toggleData = UIToggles[toggleKey]
     if not toggleData then return end
     
@@ -274,7 +357,7 @@ local function UpdateUIToggle(toggleKey, state)
     end)
 end
 
-local function CreateTab(name)
+function CreateTab(name)
     local tabButton = Instance.new("TextButton")
     tabButton.Size = UDim2.new(1, -16, 0, 28)
     tabButton.BackgroundColor3 = Cores.TabInativa
@@ -327,7 +410,7 @@ local function CreateTab(name)
     return contentPage
 end
 
-local function CreateSection(parent, title)
+function CreateSection(parent, title)
     local sectionFrame = Instance.new("Frame")
     sectionFrame.Size = UDim2.new(0.94, 0, 0, 26)
     sectionFrame.BackgroundTransparency = 1
@@ -339,7 +422,6 @@ local function CreateSection(parent, title)
     bar.Position = UDim2.new(0, 0, 0, 6)
     bar.BackgroundColor3 = Cores.Destaque
     bar.BorderSizePixel = 0
-    bar.Visible = true
     bar.Parent = sectionFrame
     
     local sectionLabel = Instance.new("TextLabel")
@@ -351,13 +433,12 @@ local function CreateSection(parent, title)
     sectionLabel.TextSize = 12
     sectionLabel.Font = Enum.Font.GothamBlack
     sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    sectionLabel.Visible = true
     sectionLabel.Parent = sectionFrame
     
     return sectionFrame
 end
 
-local function CreateToggleWithBind(parent, name, default, bindDefault, toggleKey, callback, bindCallback)
+function CreateToggleWithBind(parent, name, default, bindDefault, toggleKey, callback, bindCallback)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Size = UDim2.new(0.94, 0, 0, 48)
     toggleFrame.BackgroundColor3 = Cores.Card
@@ -456,7 +537,7 @@ local function CreateToggleWithBind(parent, name, default, bindDefault, toggleKe
     return toggleFrame
 end
 
-local function CreateSlider(parent, name, min, max, default, callback)
+function CreateSlider(parent, name, min, max, default, callback)
     local sliderFrame = Instance.new("Frame")
     sliderFrame.Size = UDim2.new(0.94, 0, 0, 48)
     sliderFrame.BackgroundColor3 = Cores.Card
@@ -608,7 +689,7 @@ local function CreateToggle(parent, name, default, toggleKey, callback)
     return toggleFrame
 end
 
-local function CreateTextBox(parent, name, placeholder, default, callback)
+function CreateTextBox(parent, name, placeholder, default, callback)
     local inputFrame = Instance.new("Frame")
     inputFrame.Size = UDim2.new(0.94, 0, 0, 56)
     inputFrame.BackgroundColor3 = Cores.Card
@@ -662,10 +743,9 @@ local function CreateTextBox(parent, name, placeholder, default, callback)
     return inputFrame
 end
 
-local statusText
 local counterLabel
 
-local function CreateDungeonButton(parent)
+function CreateDungeonButton(parent)
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(0.94, 0, 0, 80)
     buttonFrame.BackgroundColor3 = Cores.Card
@@ -737,13 +817,6 @@ local function CreateDungeonButton(parent)
 
             if not remote then
                 warn("Remote 'changeStartValue' not found!")
-                if statusText then
-                    statusText.Text = "Remote not found!"
-                    statusText.TextColor3 = Cores.Fechar
-                    task.wait(2)
-                    statusText.Text = "Aguardando inicio..."
-                    statusText.TextColor3 = Cores.TextoPrimario
-                end
                 return
             end
 
@@ -752,22 +825,6 @@ local function CreateDungeonButton(parent)
                 NightHub.DungeonStartCount = NightHub.DungeonStartCount + 1
                 if counterLabel then
                     counterLabel.Text = "Runs: " .. tostring(NightHub.DungeonStartCount)
-                end
-                if statusText then
-                    statusText.Text = "Dungeon started!"
-                    statusText.TextColor3 = Cores.StartGreen
-                    task.wait(0.5)
-                    statusText.Text = "Aguardando proximo inicio..."
-                    statusText.TextColor3 = Cores.TextoPrimario
-                end
-            else
-                warn("Remote 'changeStartValue' is not a RemoteEvent!")
-                if statusText then
-                    statusText.Text = "Invalid remote!"
-                    statusText.TextColor3 = Cores.Fechar
-                    task.wait(2)
-                    statusText.Text = "Aguardando inicio..."
-                    statusText.TextColor3 = Cores.TextoPrimario
                 end
             end
         end)
@@ -778,64 +835,109 @@ local function CreateDungeonButton(parent)
     return buttonFrame
 end
 
+function CreateAutoRetryToggle(parent)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(0.94, 0, 0, 52)
+    toggleFrame.BackgroundColor3 = Cores.Card
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.LayoutOrder = #parent:GetChildren()
+    toggleFrame.Parent = parent
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = toggleFrame
+
+    local functionLabel = Instance.new("TextLabel")
+    functionLabel.Size = UDim2.new(0.65, 0, 0, 22)
+    functionLabel.Position = UDim2.new(0, 12, 0, 15)
+    functionLabel.BackgroundTransparency = 1
+    functionLabel.Text = "Auto Retry Ativo"
+    functionLabel.TextColor3 = Cores.TextoPrimario
+    functionLabel.TextSize = 13
+    functionLabel.Font = Enum.Font.GothamBold
+    functionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    functionLabel.Parent = toggleFrame
+
+    local switchBg = Instance.new("Frame")
+    switchBg.Size = UDim2.new(0, 38, 0, 20)
+    switchBg.Position = UDim2.new(1, -50, 0.5, -10)
+    switchBg.BackgroundColor3 = NightHub.AutoRetryAtivo and Cores.SwitchOn or Cores.SwitchOff
+    switchBg.BorderSizePixel = 0
+    switchBg.Parent = toggleFrame
+    local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = switchBg
+
+    local switchKnob = Instance.new("Frame")
+    switchKnob.Size = UDim2.new(0, 16, 0, 16)
+    switchKnob.Position = NightHub.AutoRetryAtivo and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    switchKnob.BorderSizePixel = 0
+    switchKnob.Parent = switchBg
+    local kc = Instance.new("UICorner"); kc.CornerRadius = UDim.new(1, 0); kc.Parent = switchKnob
+
+    UIToggles["AutoRetry"] = { SwitchBg = switchBg, SwitchKnob = switchKnob }
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 38, 0, 20)
+    toggleBtn.Position = UDim2.new(1, -50, 0.5, -10)
+    toggleBtn.BackgroundTransparency = 1
+    toggleBtn.Text = ""
+    toggleBtn.Parent = toggleFrame
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        NightHub.AutoRetryAtivo = not NightHub.AutoRetryAtivo
+        UpdateUIToggle("AutoRetry", NightHub.AutoRetryAtivo)
+        if NightHub.AutoRetryAtivo then
+            pcall(function()
+                loadstring(game:HttpGet('https://raw.githubusercontent.com/ValorantIsKewl/RBX/refs/heads/main/DQAutoRetry'))()
+            end)
+        end
+    end)
+
+    return toggleFrame
+end
+
 -- =========================================================================
--- SISTEMA DE BINDS GLOBAL (COM FIX DE BLOQUEIO DURANTE INPUT)
+-- SISTEMA DE BINDS GLOBAL
 -- =========================================================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    -- O fix principal: se o Roblox já processou (digitando em TextBox), ignora binds
     if gameProcessed then return end
     
     if input.UserInputType == Enum.UserInputType.Keyboard then
         local key = input.KeyCode
         
-        -- Toggle UI
         if Binds.ToggleUI and key == Enum.KeyCode[Binds.ToggleUI] then
             ScreenGui.Enabled = not ScreenGui.Enabled
             return
         end
         
-        -- Spammer
         if Binds.Spammer and key == Enum.KeyCode[Binds.Spammer] then
             NightHub.SpammerAtivo = not NightHub.SpammerAtivo
             UpdateUIToggle("Spammer", NightHub.SpammerAtivo)
-            if NightHub.SpammerAtivo then
-                iniciarSpammer()
-            else
-                pararSpammer()
-            end
+            if NightHub.SpammerAtivo then iniciarSpammer() else pararSpammer() end
         end
         
-        -- Farm
         if Binds.Farm and key == Enum.KeyCode[Binds.Farm] then
-            NightHub.TweenFarmAtivo = not NightHub.TweenFarmAtivo
-            UpdateUIToggle("Farm", NightHub.TweenFarmAtivo)
-            if NightHub.TweenFarmAtivo then
-                iniciarFarm()
-            else
-                pararFarm()
-            end
+            NightHub.FarmAtivo = not NightHub.FarmAtivo
+            UpdateUIToggle("Farm", NightHub.FarmAtivo)
+            if NightHub.FarmAtivo then iniciarFarm() else pararFarm() end
         end
         
-        -- NoVFX
+        if Binds.Fly and key == Enum.KeyCode[Binds.Fly] then
+            NightHub.FlyAtivo = not NightHub.FlyAtivo
+            UpdateUIToggle("Fly", NightHub.FlyAtivo)
+            if NightHub.FlyAtivo then iniciarFly() else pararFly() end
+        end
+        
         if Binds.NoVFX and key == Enum.KeyCode[Binds.NoVFX] then
             NightHub.NoVFXAtivo = not NightHub.NoVFXAtivo
             UpdateUIToggle("NoVFX", NightHub.NoVFXAtivo)
-            if NightHub.NoVFXAtivo then
-                ativarNoVFX()
-            else
-                desativarNoVFX()
-            end
+            if NightHub.NoVFXAtivo then ativarNoVFX() else desativarNoVFX() end
         end
         
-        -- Speed
         if Binds.Speed and key == Enum.KeyCode[Binds.Speed] then
             NightHub.VelocidadeExtra = not NightHub.VelocidadeExtra
             UpdateUIToggle("Speed", NightHub.VelocidadeExtra)
-            if NightHub.VelocidadeExtra then
-                ativarVelocidadeExtra()
-            else
-                desativarVelocidadeExtra()
-            end
+            if NightHub.VelocidadeExtra then ativarVelocidadeExtra() else desativarVelocidadeExtra() end
         end
     end
 end)
@@ -877,60 +979,276 @@ function pararSpammer()
 end
 
 -- =========================================================================
--- FARM
+-- FLY MANUAL (TOGGLE SEPARADO)
 -- =========================================================================
-local function getClosestEnemy()
-    local closest, shortestDist = nil, math.huge
+local bv, bg
+local function getCharacterParts()
     local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
-    local myPos = char.HumanoidRootPart.Position
+    if char then
+        return char, char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Humanoid")
+    end
+    return nil, nil, nil
+end
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj.Name ~= LocalPlayer.Name then
-            local hum = obj:FindFirstChild("Humanoid")
-            local hrp = obj:FindFirstChild("HumanoidRootPart")
-            if hum and hrp and hum.Health > 0 then
-                local dist = (hrp.Position - myPos).Magnitude
-                if dist < shortestDist then shortestDist = dist; closest = obj end
+function iniciarFly()
+    local char, rootPart, humanoid = getCharacterParts()
+    if not char or not rootPart or not humanoid then return end
+    
+    if not bv then
+        bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    end
+    if not bg then
+        bg = Instance.new("BodyGyro")
+        bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        bg.P = 20000
+    end
+    
+    bv.Parent = rootPart
+    bg.Parent = rootPart
+    humanoid.PlatformStand = true
+    
+    -- Noclip
+    if Connections.FlyNoclip then Connections.FlyNoclip:Disconnect() end
+    Connections.FlyNoclip = RunService.Stepped:Connect(function()
+        if NightHub.FlyAtivo and char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
             end
         end
+    end)
+    
+    -- Movimento manual
+    if Connections.FlyMovement then Connections.FlyMovement:Disconnect() end
+    Connections.FlyMovement = RunService.Heartbeat:Connect(function()
+        if not NightHub.FlyAtivo then return end
+        pcall(function()
+            local _, rp, _ = getCharacterParts()
+            if not rp then return end
+            
+            local camera = workspace.CurrentCamera
+            local moveDir = Vector3.new(0, 0, 0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+            
+            if moveDir.Magnitude > 0 then
+                bv.Velocity = moveDir.Unit * NightHub.FlightSpeed
+            else
+                bv.Velocity = Vector3.new(0, 0.1, 0)
+            end
+            
+            bg.CFrame = CFrame.new(rp.Position, rp.Position + Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z))
+        end)
+    end)
+end
+
+function pararFly()
+    NightHub.FlyAtivo = false
+    
+    if bv and not NightHub.FarmAtivo then
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Parent = nil
     end
-    return closest
+    if bg and not NightHub.FarmAtivo then
+        bg.Parent = nil
+    end
+    
+    pcall(function()
+        local _, _, humanoid = getCharacterParts()
+        if humanoid and not NightHub.FarmAtivo then
+            humanoid.PlatformStand = false
+        end
+    end)
+    
+    if Connections.FlyNoclip then Connections.FlyNoclip:Disconnect(); Connections.FlyNoclip = nil end
+    if Connections.FlyMovement then Connections.FlyMovement:Disconnect(); Connections.FlyMovement = nil end
+end
+
+-- =========================================================================
+-- VOID-STALKER FARM (COM DETECÇÃO DE VOIDSHADE - ANDA PARA A FRENTE)
+-- =========================================================================
+local farmFlying = false
+local currentTarget = nil
+local farmChar, farmRoot, farmHum
+
+local function updateFarmChar()
+    local char = LocalPlayer.Character
+    if char then
+        farmChar = char
+        farmRoot = char:FindFirstChild("HumanoidRootPart")
+        farmHum = char:FindFirstChild("Humanoid")
+        return true
+    end
+    return false
+end
+
+local function getBestPart(model)
+    local target = model:FindFirstChild("HumanoidRootPart") or 
+                   model:FindFirstChild("Torso") or 
+                   model:FindFirstChild("LowerTorso") or 
+                   model:FindFirstChild("UpperTorso") or 
+                   model.PrimaryPart or 
+                   model:FindFirstChildWhichIsA("BasePart")
+    if target and target:IsA("BasePart") then return target end
+    if target and target:IsA("Model") then return target:FindFirstChildWhichIsA("BasePart") end
+    return nil
+end
+
+local function isVoidShade(name)
+    local n = string.lower(name)
+    return string.find(n, "voidshade") or string.find(n, "void shade")
 end
 
 function iniciarFarm()
-    if Connections.FarmLoop then return end
-    Connections.FarmLoop = RunService.Heartbeat:Connect(function()
-        if not NightHub.TweenFarmAtivo then return end
+    if not updateFarmChar() then return end
+    
+    if not bv then
+        bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    end
+    if not bg then
+        bg = Instance.new("BodyGyro")
+        bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        bg.P = 20000
+    end
+    
+    farmFlying = true
+    bv.Parent = farmRoot
+    bg.Parent = farmRoot
+    farmHum.PlatformStand = true
+    
+    -- Noclip
+    if Connections.FarmNoclip then Connections.FarmNoclip:Disconnect() end
+    Connections.FarmNoclip = RunService.Stepped:Connect(function()
+        if farmFlying and farmChar then
+            for _, part in pairs(farmChar:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+    end)
+    
+    -- Busca de Alvo (também detecta VoidShades)
+    local targetSearchRunning = true
+    if Connections.FarmTargetSearch then Connections.FarmTargetSearch:Disconnect() end
+    Connections.FarmTargetSearch = task.spawn(function()
+        while targetSearchRunning and NightHub.FarmAtivo do
+            pcall(function()
+                if not updateFarmChar() then return end
+                
+                local closestNormal = nil
+                local closestVoid = nil
+                local shortestNormal = NightHub.MaxDetectionRange
+                local shortestVoid = NightHub.MaxDetectionRange
+                
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Humanoid") and v.Parent ~= farmChar and v.Health > 0 then
+                        local model = v.Parent
+                        local targetPart = getBestPart(model)
+                        if targetPart and targetPart:IsA("BasePart") then
+                            local d = (targetPart.Position - farmRoot.Position).Magnitude
+                            
+                            if isVoidShade(model.Name) then
+                                if d < shortestVoid then
+                                    shortestVoid = d
+                                    closestVoid = targetPart
+                                end
+                            else
+                                if d < shortestNormal then
+                                    shortestNormal = d
+                                    closestNormal = targetPart
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                currentTarget = closestNormal or closestVoid
+            end)
+            task.wait(0.3)
+        end
+    end)
+    
+    -- Hitbox
+    local hitboxRunning = true
+    if Connections.FarmHitbox then Connections.FarmHitbox:Disconnect() end
+    Connections.FarmHitbox = task.spawn(function()
+        while hitboxRunning and NightHub.FarmAtivo do
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Humanoid") and v.Parent ~= farmChar then
+                        local targetPart = getBestPart(v.Parent)
+                        if targetPart and targetPart:IsA("BasePart") and targetPart.Size.Y < NightHub.HitboxSize then
+                            targetPart.Size = Vector3.new(NightHub.HitboxSize, NightHub.HitboxSize, NightHub.HitboxSize)
+                            targetPart.Transparency = 1
+                            targetPart.CanCollide = false
+                        end
+                    end
+                end
+            end)
+            task.wait(2)
+        end
+    end)
+    
+    -- Loop de Movimento
+    if Connections.FarmMovement then Connections.FarmMovement:Disconnect() end
+    Connections.FarmMovement = RunService.Heartbeat:Connect(function()
+        if not farmFlying or not NightHub.FarmAtivo then return end
+        
         pcall(function()
-            local char = LocalPlayer.Character
-            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-            local hrp = char.HumanoidRootPart
-            local target = getClosestEnemy()
-            if target and target:FindFirstChild("HumanoidRootPart") then
-                local th = target.HumanoidRootPart
-                local dest = Vector3.new(th.Position.x, th.Position.y + NightHub.TweenHeight, th.Position.z)
-                local dir = (dest - hrp.Position).Unit
-                local dist = (dest - hrp.Position).Magnitude
-                if dist > 0.5 then
-                    hrp.Position = hrp.Position + dir * math.min(NightHub.TweenSpeed * 0.3, dist)
+            if not updateFarmChar() then return end
+            
+            if currentTarget and currentTarget:IsA("BasePart") and currentTarget.Parent then
+                local targetPos = currentTarget.Position
+                local undergroundPos = Vector3.new(targetPos.X, targetPos.Y + NightHub.FixedDepth, targetPos.Z)
+                local direction = (undergroundPos - farmRoot.Position)
+                
+                if direction.Magnitude > 1 then
+                    bv.Velocity = direction.Unit * NightHub.FlightSpeed
+                else
+                    bv.Velocity = Vector3.new(0, 0, 0)
                 end
-                for _, t in ipairs(char:GetChildren()) do
-                    if t:IsA("Tool") then pcall(function() t:Activate() end) end
-                end
+                
+                bg.CFrame = CFrame.new(farmRoot.Position, Vector3.new(targetPos.X, farmRoot.Position.Y, targetPos.Z))
+            else
+                -- Anda para a frente
+                local forward = farmRoot.CFrame.LookVector
+                bv.Velocity = Vector3.new(forward.X, 0, forward.Z).Unit * (NightHub.FlightSpeed * 0.7)
             end
         end)
     end)
 end
 
 function pararFarm()
-    if Connections.FarmLoop then 
-        Connections.FarmLoop:Disconnect()
-        Connections.FarmLoop = nil 
+    farmFlying = false
+    currentTarget = nil
+    NightHub.FarmAtivo = false
+    
+    if bv and not NightHub.FlyAtivo then
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.Parent = nil
     end
+    if bg and not NightHub.FlyAtivo then
+        bg.Parent = nil
+    end
+    
+    pcall(function()
+        if updateFarmChar() and not NightHub.FlyAtivo then
+            farmHum.PlatformStand = false
+        end
+    end)
+    
+    if Connections.FarmNoclip then Connections.FarmNoclip:Disconnect(); Connections.FarmNoclip = nil end
+    if Connections.FarmTargetSearch then pcall(task.cancel, Connections.FarmTargetSearch); Connections.FarmTargetSearch = nil end
+    if Connections.FarmHitbox then pcall(task.cancel, Connections.FarmHitbox); Connections.FarmHitbox = nil end
+    if Connections.FarmMovement then Connections.FarmMovement:Disconnect(); Connections.FarmMovement = nil end
 end
 
+-- =========================================================================
 -- NoVFX
+-- =========================================================================
 local function isHabilidade(nome)
     nome = string.upper(nome)
     for _, k in ipairs({"PULSE","LIGHTNING","MAGIC","EFFECT","SPELL","ATTACK","BOMB","EXPLOSION","BLAST","FIRE","ICE","THUNDER","STORM","WIND","EARTH","WATER","SHADOW","LIGHT","DARK","HOLY","DEMON","DRAGON","PHOENIX","WOLF","SKILL","POWER","BURST","SLASH","CUT","STAB"}) do
@@ -956,13 +1274,12 @@ function ativarNoVFX()
 end
 
 function desativarNoVFX()
-    if Connections.VFX then 
-        Connections.VFX:Disconnect()
-        Connections.VFX = nil 
-    end
+    if Connections.VFX then Connections.VFX:Disconnect(); Connections.VFX = nil end
 end
 
--- Velocidade
+-- =========================================================================
+-- Velocidade Extra
+-- =========================================================================
 function ativarVelocidadeExtra()
     if Connections.SpeedLoop then Connections.SpeedLoop:Disconnect() end
     Connections.SpeedLoop = RunService.Heartbeat:Connect(function()
@@ -979,10 +1296,7 @@ function ativarVelocidadeExtra()
 end
 
 function desativarVelocidadeExtra()
-    if Connections.SpeedLoop then 
-        Connections.SpeedLoop:Disconnect()
-        Connections.SpeedLoop = nil 
-    end
+    if Connections.SpeedLoop then Connections.SpeedLoop:Disconnect(); Connections.SpeedLoop = nil end
     pcall(function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
@@ -991,22 +1305,6 @@ function desativarVelocidadeExtra()
     end)
 end
 
--- Seguranca
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    if char:FindFirstChild("Humanoid") then
-        NightHub.OriginalWalkSpeed = char.Humanoid.WalkSpeed
-        task.wait(0.2)
-        if NightHub.VelocidadeExtra then
-            local speed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
-            if speed > 25 then speed = 25 end
-            char.Humanoid.WalkSpeed = speed
-        else
-            char.Humanoid.WalkSpeed = NightHub.OriginalWalkSpeed
-        end
-    end
-end)
-
 -- =========================================================================
 -- SISTEMA DE CORREÇÃO DE NOMES (NAME CHANGER / HIDER)
 -- =========================================================================
@@ -1014,7 +1312,7 @@ local MatchedTextLabels = {}
 local defaultDisplayName = LocalPlayer.DisplayName
 local defaultName = LocalPlayer.Name
 
-local function applyToTextLabel(label)
+function applyToTextLabel(label)
     if not label:IsA("TextLabel") and not label:IsA("TextBox") then return end
     if MatchedTextLabels[label] then return end
     
@@ -1037,7 +1335,7 @@ local function applyToTextLabel(label)
     end
 end
 
-local function refreshAllTextLabels()
+function refreshAllTextLabels()
     for label, data in pairs(MatchedTextLabels) do
         pcall(function()
             local targetText = data.OriginalText
@@ -1048,7 +1346,7 @@ local function refreshAllTextLabels()
     end
 end
 
-local function iniciarNameChanger()
+function iniciarNameChanger()
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     local function scan(root) for _, descendant in ipairs(root:GetDescendants()) do pcall(applyToTextLabel, descendant) end end
     scan(playerGui)
@@ -1059,9 +1357,37 @@ local function iniciarNameChanger()
 end
 
 -- =========================================================================
--- PAGINAS
+-- Seguranca (Character Respawn)
+-- =========================================================================
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    if char:FindFirstChild("Humanoid") then
+        NightHub.OriginalWalkSpeed = char.Humanoid.WalkSpeed
+        if NightHub.VelocidadeExtra then
+            local speed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
+            if speed > 25 then speed = 25 end
+            char.Humanoid.WalkSpeed = speed
+        end
+    end
+    
+    if NightHub.FlyAtivo then
+        pararFly()
+        task.wait(0.3)
+        iniciarFly()
+    end
+    
+    if NightHub.FarmAtivo then
+        pararFarm()
+        task.wait(0.3)
+        iniciarFarm()
+    end
+end)
+
+-- =========================================================================
+-- PAGINAS DA UI
 -- =========================================================================
 
+-- COMBATE
 local CombatPage = CreateTab("Combate")
 CreateSection(CombatPage, "SPAM DE HABILIDADES")
 CreateToggleWithBind(CombatPage, "Spammer Automatico", false, Binds.Spammer, "Spammer",
@@ -1080,20 +1406,374 @@ CreateToggleWithBind(CombatPage, "Ocultar Efeitos Visuais", NightHub.NoVFXAtivo,
     function(bind) Binds.NoVFX = bind end
 )
 
+-- FARM
 local FarmPage = CreateTab("Farm")
-CreateSection(FarmPage, "AUTO FARM")
-CreateToggleWithBind(FarmPage, "Auto Farm Inteligente", NightHub.TweenFarmAtivo, Binds.Farm, "Farm",
-    function(value) NightHub.TweenFarmAtivo = value; if value then iniciarFarm() else pararFarm() end end,
+CreateSection(FarmPage, "FLY MANUAL")
+CreateToggleWithBind(FarmPage, "Fly Manual (WASD)", false, Binds.Fly, "Fly",
+    function(value) NightHub.FlyAtivo = value; if value then iniciarFly() else pararFly() end end,
+    function(bind) Binds.Fly = bind end
+)
+
+CreateSection(FarmPage, "VOID-STALKER FARM")
+CreateToggleWithBind(FarmPage, "Auto Farm (Normal > VoidShade)", false, Binds.Farm, "Farm",
+    function(value) NightHub.FarmAtivo = value; if value then iniciarFarm() else pararFarm() end end,
     function(bind) Binds.Farm = bind end
 )
 
-CreateSlider(FarmPage, "Altura de Voo", 0, 30, NightHub.TweenHeight, function(value) NightHub.TweenHeight = value end)
-CreateSlider(FarmPage, "Velocidade de Voo", 5, 40, NightHub.TweenSpeed, function(value) NightHub.TweenSpeed = value end)
+CreateSlider(FarmPage, "Velocidade de Voo", 10, 50, NightHub.FlightSpeed, function(value) NightHub.FlightSpeed = value end)
+CreateSlider(FarmPage, "Profundidade", -30, -5, NightHub.FixedDepth, function(value) NightHub.FixedDepth = value end)
+CreateSlider(FarmPage, "Alcance de Detecção", 100, 1000, NightHub.MaxDetectionRange, function(value) NightHub.MaxDetectionRange = value end)
+CreateSlider(FarmPage, "Tamanho do Hitbox", 50, 200, NightHub.HitboxSize, function(value) NightHub.HitboxSize = value end)
 
+-- DUNGEON
 local DungeonPage = CreateTab("Dungeon")
 CreateSection(DungeonPage, "INICIAR DUNGEON")
 CreateDungeonButton(DungeonPage)
+CreateSection(DungeonPage, "AUTO RETRY")
+CreateAutoRetryToggle(DungeonPage)
 
+-- =========================================================================
+-- ABA SELL - AUTO SELL COM SELEÇÃO DE RARIDADES
+-- =========================================================================
+local SellPage = CreateTab("Sell")
+
+-- Referência ao label de status do AutoSell (para atualizar ao ligar/desligar)
+local sellStatusLabel
+
+-- Tabela de referências aos botões de raridade para atualização visual
+local SellRarityButtons = {}
+
+-- Definições de categorias e raridades
+local categorias = {
+    { key = "weapon",  label = "Weapon" },
+    { key = "chest",   label = "Chest" },
+    { key = "helmet",  label = "Helmet" },
+    { key = "ability", label = "Ability" },
+    { key = "ring",    label = "Ring" },
+}
+
+local raridades = {
+    { key = "ultimate",  label = "Ultimate", cor = Cores.Ultimate },
+    { key = "legendary", label = "Lendário", cor = Cores.Legendary },
+    { key = "epic",      label = "Épico",    cor = Cores.Epic },
+    { key = "rare",      label = "Raro",     cor = Cores.Rare },
+    { key = "uncommon",  label = "Incomum",  cor = Cores.Uncommon },
+    { key = "common",    label = "Comum",    cor = Cores.Common },
+}
+
+-- Mapa de quais raridades existem por categoria
+local raridadesPorCategoria = {
+    weapon  = {"ultimate", "legendary", "epic", "rare", "uncommon", "common"},
+    chest   = {"epic", "rare", "uncommon", "common"},
+    helmet  = {"epic", "rare", "uncommon", "common"},
+    ability = {"legendary", "epic", "rare", "uncommon", "common"},
+    ring    = {"epic", "rare", "uncommon", "common"},
+}
+
+-- Função auxiliar: retorna a cor de uma raridade pelo key
+local function getCorRaridade(rarKey)
+    for _, r in ipairs(raridades) do
+        if r.key == rarKey then return r.cor end
+    end
+    return Cores.TextoSecundario
+end
+
+-- Função auxiliar: retorna o label de uma raridade pelo key
+local function getLabelRaridade(rarKey)
+    for _, r in ipairs(raridades) do
+        if r.key == rarKey then return r.label end
+    end
+    return rarKey
+end
+
+-- Atualiza a aparência visual de um botão de raridade
+function atualizarBotaoRaridade(catKey, rarKey)
+    local ref = SellRarityButtons[catKey] and SellRarityButtons[catKey][rarKey]
+    if not ref then return end
+    local ativo = AutoSellSettings[catKey] and AutoSellSettings[catKey][rarKey]
+    local cor = getCorRaridade(rarKey)
+    
+    -- Tenta encontrar o Stroke se existir
+    local stroke = ref:FindFirstChildOfClass("UIStroke")
+    
+    if ativo then
+        ref.BackgroundColor3 = cor
+        ref.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ref.BackgroundTransparency = 0
+        if stroke then stroke.Transparency = 1 end
+    else
+        -- Quando desativado, fica cinza escuro e o texto fica com cor apagada
+        ref.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        ref.TextColor3 = Color3.fromRGB(100, 100, 110)
+        ref.BackgroundTransparency = 0.3
+        if stroke then 
+            stroke.Transparency = 0.5 
+            stroke.Color = Color3.fromRGB(80, 80, 90)
+        end
+    end
+end
+
+-- Seção: Toggle principal do AutoSell
+CreateSection(SellPage, "AUTO SELL")
+
+-- Card do toggle principal
+do
+    local mainCard = Instance.new("Frame")
+    mainCard.Size = UDim2.new(0.94, 0, 0, 52)
+    mainCard.BackgroundColor3 = Cores.Card
+    mainCard.BorderSizePixel = 0
+    mainCard.LayoutOrder = #SellPage:GetChildren()
+    mainCard.Parent = SellPage
+    local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 8); mc.Parent = mainCard
+
+    local mainLabel = Instance.new("TextLabel")
+    mainLabel.Size = UDim2.new(0.65, 0, 0, 22)
+    mainLabel.Position = UDim2.new(0, 12, 0, 6)
+    mainLabel.BackgroundTransparency = 1
+    mainLabel.Text = "Auto Sell Ativo"
+    mainLabel.TextColor3 = Cores.TextoPrimario
+    mainLabel.TextSize = 13
+    mainLabel.Font = Enum.Font.GothamBold
+    mainLabel.TextXAlignment = Enum.TextXAlignment.Left
+    mainLabel.Parent = mainCard
+
+    sellStatusLabel = Instance.new("TextLabel")
+    sellStatusLabel.Size = UDim2.new(0.94, 0, 0, 18)
+    sellStatusLabel.Position = UDim2.new(0, 12, 0, 28)
+    sellStatusLabel.BackgroundTransparency = 1
+    sellStatusLabel.Text = "Status: Desativado"
+    sellStatusLabel.TextColor3 = Cores.TextoSecundario
+    sellStatusLabel.TextSize = 11
+    sellStatusLabel.Font = Enum.Font.GothamSemibold
+    sellStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    sellStatusLabel.Parent = mainCard
+
+    local switchBg = Instance.new("Frame")
+    switchBg.Size = UDim2.new(0, 38, 0, 20)
+    switchBg.Position = UDim2.new(1, -50, 0.5, -10)
+    switchBg.BackgroundColor3 = Cores.SwitchOff
+    switchBg.BorderSizePixel = 0
+    switchBg.Parent = mainCard
+    local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = switchBg
+
+    local switchKnob = Instance.new("Frame")
+    switchKnob.Size = UDim2.new(0, 16, 0, 16)
+    switchKnob.Position = UDim2.new(0, 2, 0.5, -8)
+    switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    switchKnob.BorderSizePixel = 0
+    switchKnob.Parent = switchBg
+    local kc = Instance.new("UICorner"); kc.CornerRadius = UDim.new(1, 0); kc.Parent = switchKnob
+
+    UIToggles["AutoSell"] = { SwitchBg = switchBg, SwitchKnob = switchKnob }
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 38, 0, 20)
+    toggleBtn.Position = UDim2.new(1, -50, 0.5, -10)
+    toggleBtn.BackgroundTransparency = 1
+    toggleBtn.Text = ""
+    toggleBtn.Parent = mainCard
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        NightHub.AutoSellAtivo = not NightHub.AutoSellAtivo
+        UpdateUIToggle("AutoSell", NightHub.AutoSellAtivo)
+        if NightHub.AutoSellAtivo then
+            sellStatusLabel.Text = "Status: Ativo — vendendo itens..."
+            sellStatusLabel.TextColor3 = Cores.StartGreen
+            -- Carrega e executa o AutoSell com as configurações actuais
+            pcall(function()
+                local autoSell = loadstring(game:HttpGet('https://raw.githubusercontent.com/ValorantIsKewl/RBX/refs/heads/main/DQautoSell.lua'))()
+                autoSell(AutoSellSettings)
+            end)
+        else
+            sellStatusLabel.Text = "Status: Desativado"
+            sellStatusLabel.TextColor3 = Cores.TextoSecundario
+        end
+    end)
+end
+
+-- Seção: Configuração de raridades por categoria
+CreateSection(SellPage, "RARIDADES POR CATEGORIA")
+
+-- Cria um card por categoria com botões de raridade
+for _, cat in ipairs(categorias) do
+    local catRaridades = raridadesPorCategoria[cat.key]
+    if not catRaridades then continue end
+
+    -- Calcula altura do card: título (22) + linha de botões (28) + padding (16)
+    local cardHeight = 22 + 28 + 16
+    if cat.key == "weapon" or cat.key == "ability" then cardHeight = cardHeight + 4 end -- Pequeno ajuste para caber Lendário/Ultimate
+
+    local catCard = Instance.new("Frame")
+    catCard.Size = UDim2.new(0.94, 0, 0, cardHeight)
+    catCard.BackgroundColor3 = Cores.Card
+    catCard.BorderSizePixel = 0
+    catCard.LayoutOrder = #SellPage:GetChildren()
+    catCard.Parent = SellPage
+    local ccc = Instance.new("UICorner"); ccc.CornerRadius = UDim.new(0, 8); ccc.Parent = catCard
+
+    -- Título da categoria
+    local catLabel = Instance.new("TextLabel")
+    catLabel.Size = UDim2.new(1, -24, 0, 20)
+    catLabel.Position = UDim2.new(0, 12, 0, 6)
+    catLabel.BackgroundTransparency = 1
+    catLabel.Text = cat.label
+    catLabel.TextColor3 = Cores.TextoPrimario
+    catLabel.TextSize = 13
+    catLabel.Font = Enum.Font.GothamBold
+    catLabel.TextXAlignment = Enum.TextXAlignment.Left
+    catLabel.Parent = catCard
+
+    -- Botões de raridade em linha
+    local btnContainer = Instance.new("Frame")
+    btnContainer.Size = UDim2.new(1, -24, 0, 26)
+    btnContainer.Position = UDim2.new(0, 12, 0, 28)
+    btnContainer.BackgroundTransparency = 1
+    btnContainer.Parent = catCard
+
+    local btnLayout = Instance.new("UIListLayout")
+    btnLayout.FillDirection = Enum.FillDirection.Horizontal
+    btnLayout.Padding = UDim.new(0, 4)
+    btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    btnLayout.Parent = btnContainer
+
+    SellRarityButtons[cat.key] = {}
+
+    for _, rarKey in ipairs(catRaridades) do
+        -- Só cria o botão se a raridade existe para esta categoria
+        if AutoSellSettings[cat.key] and AutoSellSettings[cat.key][rarKey] ~= nil then
+            local rarLabel = getLabelRaridade(rarKey)
+            local rarCor = getCorRaridade(rarKey)
+            local isAtivo = AutoSellSettings[cat.key][rarKey]
+
+            local rarBtn = Instance.new("TextButton")
+            local btnWidth = 58
+            if cat.key == "weapon" or cat.key == "ability" then btnWidth = 50 end -- Diminuir largura para caber todos na mesma linha
+            rarBtn.Size = UDim2.new(0, btnWidth, 0, 24)
+            
+            -- Borda para indicar a raridade
+            local rbStroke = Instance.new("UIStroke")
+            rbStroke.Thickness = 1.5
+            rbStroke.Parent = rarBtn
+
+            if isAtivo then
+                rarBtn.BackgroundColor3 = rarCor
+                rarBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                rarBtn.BackgroundTransparency = 0
+                rbStroke.Transparency = 1
+                rbStroke.Color = rarCor
+            else
+                rarBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+                rarBtn.TextColor3 = Color3.fromRGB(100, 100, 110)
+                rarBtn.BackgroundTransparency = 0.3
+                rbStroke.Transparency = 0.5
+                rbStroke.Color = Color3.fromRGB(80, 80, 90)
+            end
+
+            rarBtn.Text = rarLabel
+            rarBtn.TextSize = 10
+            rarBtn.Font = Enum.Font.GothamBold
+            rarBtn.AutoButtonColor = false
+            rarBtn.Parent = btnContainer
+
+            local rbc = Instance.new("UICorner"); rbc.CornerRadius = UDim.new(0, 5); rbc.Parent = rarBtn
+
+            SellRarityButtons[cat.key][rarKey] = rarBtn
+
+            local catKeyCapture = cat.key
+            local rarKeyCapture = rarKey
+
+            rarBtn.MouseButton1Click:Connect(function()
+                AutoSellSettings[catKeyCapture][rarKeyCapture] = not AutoSellSettings[catKeyCapture][rarKeyCapture]
+                local novoEstado = AutoSellSettings[catKeyCapture][rarKeyCapture]
+                local cor = getCorRaridade(rarKeyCapture)
+
+                if novoEstado then
+                    TweenService:Create(rarBtn, TweenInfo.new(0.15), {
+                        BackgroundColor3 = cor,
+                        TextColor3 = Color3.fromRGB(255, 255, 255),
+                        BackgroundTransparency = 0
+                    }):Play()
+                    TweenService:Create(rbStroke, TweenInfo.new(0.15), {
+                        Transparency = 1,
+                        Color = cor
+                    }):Play()
+                else
+                    TweenService:Create(rarBtn, TweenInfo.new(0.15), {
+                        BackgroundColor3 = Color3.fromRGB(40, 40, 45),
+                        TextColor3 = Color3.fromRGB(100, 100, 110),
+                        BackgroundTransparency = 0.3
+                    }):Play()
+                    TweenService:Create(rbStroke, TweenInfo.new(0.15), {
+                        Transparency = 0.5,
+                        Color = Color3.fromRGB(80, 80, 90)
+                    }):Play()
+                end
+
+                -- Se o AutoSell já estiver ativo, reinicia com as novas configurações
+                if NightHub.AutoSellAtivo then
+                    pcall(function()
+                        local autoSell = loadstring(game:HttpGet('https://raw.githubusercontent.com/ValorantIsKewl/RBX/refs/heads/main/DQautoSell.lua'))()
+                        autoSell(AutoSellSettings)
+                    end)
+                end
+            end)
+        end
+    end
+end
+
+-- Seção: Botão de venda manual imediata
+CreateSection(SellPage, "VENDA MANUAL")
+
+do
+    local manualCard = Instance.new("Frame")
+    manualCard.Size = UDim2.new(0.94, 0, 0, 58)
+    manualCard.BackgroundColor3 = Cores.Card
+    manualCard.BorderSizePixel = 0
+    manualCard.LayoutOrder = #SellPage:GetChildren()
+    manualCard.Parent = SellPage
+    local mcc = Instance.new("UICorner"); mcc.CornerRadius = UDim.new(0, 8); mcc.Parent = manualCard
+
+    local manualDesc = Instance.new("TextLabel")
+    manualDesc.Size = UDim2.new(1, -24, 0, 18)
+    manualDesc.Position = UDim2.new(0, 12, 0, 6)
+    manualDesc.BackgroundTransparency = 1
+    manualDesc.Text = "Vender agora com as configurações actuais"
+    manualDesc.TextColor3 = Cores.TextoSecundario
+    manualDesc.TextSize = 11
+    manualDesc.Font = Enum.Font.GothamSemibold
+    manualDesc.TextXAlignment = Enum.TextXAlignment.Left
+    manualDesc.Parent = manualCard
+
+    local manualBtn = Instance.new("TextButton")
+    manualBtn.Size = UDim2.new(1, -24, 0, 24)
+    manualBtn.Position = UDim2.new(0, 12, 0, 26)
+    manualBtn.BackgroundColor3 = Cores.SellRed
+    manualBtn.Text = "VENDER ITENS AGORA"
+    manualBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    manualBtn.TextSize = 13
+    manualBtn.Font = Enum.Font.GothamBold
+    manualBtn.AutoButtonColor = false
+    manualBtn.Parent = manualCard
+    local mbc = Instance.new("UICorner"); mbc.CornerRadius = UDim.new(0, 6); mbc.Parent = manualBtn
+
+    manualBtn.MouseButton1Click:Connect(function()
+        manualBtn.Text = "A vender..."
+        manualBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
+        pcall(function()
+            local autoSell = loadstring(game:HttpGet('https://raw.githubusercontent.com/ValorantIsKewl/RBX/refs/heads/main/DQautoSell.lua'))()
+            autoSell(AutoSellSettings)
+        end)
+        task.delay(1.5, function()
+            pcall(function()
+                manualBtn.Text = "VENDER ITENS AGORA"
+                manualBtn.BackgroundColor3 = Cores.SellRed
+            end)
+        end)
+    end)
+end
+
+-- PROFILE
 local ProfilePage = CreateTab("Profile")
 CreateSection(ProfilePage, "CUSTOMIZAÇÃO")
 CreateToggle(ProfilePage, "Ocultar Nome", NightHub.OcultarNome, "OcultarNome", function(value)
@@ -1106,6 +1786,7 @@ CreateTextBox(ProfilePage, "Nome Personalizado", "Digite seu nome personalizado.
     refreshAllTextLabels()
 end)
 
+-- CONFIGS
 local ConfigPage = CreateTab("Config")
 CreateSection(ConfigPage, "GERENCIADOR DE CONFIGS")
 
@@ -1139,7 +1820,7 @@ end
 local saveConfigBtn = Instance.new("TextButton")
 saveConfigBtn.Size = UDim2.new(0.94, 0, 0, 30)
 saveConfigBtn.BackgroundColor3 = Cores.StartGreen
-saveConfigBtn.Text = "💾  Salvar Config"
+saveConfigBtn.Text = "Salvar Config"
 saveConfigBtn.TextColor3 = Color3.fromRGB(255,255,255)
 saveConfigBtn.TextSize = 13
 saveConfigBtn.Font = Enum.Font.GothamBold
@@ -1172,7 +1853,7 @@ configFeedback.TextXAlignment = Enum.TextXAlignment.Center
 configFeedback.LayoutOrder = #ConfigPage:GetChildren()
 configFeedback.Parent = ConfigPage
 
-local function showFeedback(msg, isError)
+function showFeedback(msg, isError)
     configFeedback.Text = msg
     configFeedback.TextColor3 = isError and Color3.fromRGB(220,60,60) or Cores.StartGreen
     task.delay(2.5, function() configFeedback.Text = "" end)
@@ -1196,10 +1877,29 @@ rebuildConfigList = function()
         loadBtn.Size = UDim2.new(0,36,0,22); loadBtn.Position = UDim2.new(1,-76,0.5,-11); loadBtn.BackgroundColor3 = Cores.BindAzul; loadBtn.Text = "Load"; loadBtn.TextColor3 = Color3.fromRGB(255,255,255); loadBtn.TextSize = 11; loadBtn.Font = Enum.Font.GothamBold; loadBtn.Parent = row
         local lc = Instance.new("UICorner"); lc.CornerRadius = UDim.new(0,5); lc.Parent = loadBtn
         local delBtn = Instance.new("TextButton")
-        delBtn.Size = UDim2.new(0,32,0,22); delBtn.Position = UDim2.new(1,-36,0.5,-11); delBtn.BackgroundColor3 = Color3.fromRGB(180,50,50); delBtn.Text = "✕"; delBtn.TextColor3 = Color3.fromRGB(255,255,255); delBtn.TextSize = 12; delBtn.Font = Enum.Font.GothamBold; delBtn.Parent = row
+        delBtn.Size = UDim2.new(0,32,0,22); delBtn.Position = UDim2.new(1,-36,0.5,-11); delBtn.BackgroundColor3 = Color3.fromRGB(180,50,50); delBtn.Text = "X"; delBtn.TextColor3 = Color3.fromRGB(255,255,255); delBtn.TextSize = 12; delBtn.Font = Enum.Font.GothamBold; delBtn.Parent = row
         local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(0,5); dc.Parent = delBtn
-        loadBtn.MouseButton1Click:Connect(function() local all = getAllConfigs() if all[cfgName] then applySnapshot(all[cfgName]) refreshAllTextLabels() showFeedback('✔ Config "' .. cfgName .. '" carregada!') end end)
-        delBtn.MouseButton1Click:Connect(function() local all = getAllConfigs() all[cfgName] = nil writeAllConfigs(all) rebuildConfigList() showFeedback('Config "' .. cfgName .. '" removida.', false) end)
+        loadBtn.MouseButton1Click:Connect(function()
+            local all = getAllConfigs()
+            if all[cfgName] then
+                applySnapshot(all[cfgName])
+                refreshAllTextLabels()
+                -- Atualiza visualmente os botões de raridade após carregar config
+                for catKey, rarMap in pairs(AutoSellSettings) do
+                    for rarKey, _ in pairs(rarMap) do
+                        atualizarBotaoRaridade(catKey, rarKey)
+                    end
+                end
+                showFeedback('Config "' .. cfgName .. '" carregada!')
+            end
+        end)
+        delBtn.MouseButton1Click:Connect(function()
+            local all = getAllConfigs()
+            all[cfgName] = nil
+            writeAllConfigs(all)
+            rebuildConfigList()
+            showFeedback('Config "' .. cfgName .. '" removida.', false)
+        end)
     end
 end
 
@@ -1210,24 +1910,17 @@ saveConfigBtn.MouseButton1Click:Connect(function()
     all[name] = getCurrentSnapshot()
     writeAllConfigs(all)
     rebuildConfigList()
-    showFeedback('✔ Config "' .. name .. '" salva!')
+    showFeedback('Config "' .. name .. '" salva!')
     configNameInput.Text = ""
     configNameInput:ReleaseFocus()
 end)
 
 rebuildConfigList()
 
--- Ativar primeira aba
-if ContentPages["Combate"] then
-    ContentPages["Combate"].Page.Visible = true
-    ContentPages["Combate"].Button.BackgroundColor3 = Cores.TabAtiva
-    ContentPages["Combate"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-end
-
 -- =========================================================================
 -- AVATAR CHANGER
 -- =========================================================================
-local function iniciarChanger()
+function iniciarChanger()
     local asset = "rbxassetid://103879899072630"
     local function isAvatarImage(label)
         local img = label.Image
@@ -1258,6 +1951,15 @@ local function iniciarChanger()
 end
 
 -- =========================================================================
+-- ATIVAR PRIMEIRA ABA
+-- =========================================================================
+if ContentPages["Combate"] then
+    ContentPages["Combate"].Page.Visible = true
+    ContentPages["Combate"].Button.BackgroundColor3 = Cores.TabAtiva
+    ContentPages["Combate"].Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+-- =========================================================================
 -- INIT FINAL
 -- =========================================================================
 task.spawn(function()
@@ -1267,3 +1969,59 @@ task.spawn(function()
     NightHub.OriginalWalkSpeed = LocalPlayer.Character.Humanoid.WalkSpeed
     if NightHub.VelocidadeExtra then ativarVelocidadeExtra() end
 end)
+print("Night Hub + Void-Stalker Farm + Fly Manual + Auto Sell ativado com sucesso!")
+print("Abas: Combate | Farm | Dungeon | Sell | Profile | Config")
+print("Binds: Spammer=R | Farm=G | Fly=F | NoVFX=H | Speed=J | UI=K | Dungeon=L")
+
+-- =========================================================================
+-- SISTEMA DE CONFIGURAÇÕES (DEFINIDO NO FINAL PARA GARANTIR QUE TODAS AS FUNÇÕES EXISTAM)
+-- =========================================================================
+
+saveConfigBtn.MouseButton1Click:Connect(function()
+    local name = configNameInput.Text
+    if name == "" then showFeedback("Digite um nome!", true) return end
+    local configs = getAllConfigs()
+    configs[name] = getCurrentSnapshot()
+    writeAllConfigs(configs)
+    showFeedback("Config '"..name.."' salva!")
+    rebuildConfigList()
+end)
+
+rebuildConfigList = function()
+    for _, child in ipairs(configListSection:GetChildren()) do if not child:IsA("UIListLayout") then child:Destroy() end end
+    local configs = getAllConfigs()
+    for cfgName, data in pairs(configs) do
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, 0, 0, 32)
+        row.BackgroundColor3 = Cores.Card
+        row.BorderSizePixel = 0
+        row.Parent = configListSection
+        local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(0,7); rc.Parent = row
+        
+        local nameTag = Instance.new("TextLabel")
+        nameTag.Size = UDim2.new(1,-80,1,0); nameTag.Position = UDim2.new(0,10,0,0); nameTag.BackgroundTransparency = 1
+        nameTag.Text = cfgName; nameTag.TextColor3 = Cores.TextoPrimario; nameTag.TextSize = 12; nameTag.Font = Enum.Font.GothamSemibold; nameTag.TextXAlignment = Enum.TextXAlignment.Left; nameTag.Parent = row
+        
+        local loadBtn = Instance.new("TextButton")
+        loadBtn.Size = UDim2.new(0,36,0,22); loadBtn.Position = UDim2.new(1,-76,0.5,-11); loadBtn.BackgroundColor3 = Cores.BindAzul; loadBtn.Text = "Load"; loadBtn.TextColor3 = Color3.fromRGB(255,255,255); loadBtn.TextSize = 11; loadBtn.Font = Enum.Font.GothamBold; loadBtn.Parent = row
+        local lc = Instance.new("UICorner"); lc.CornerRadius = UDim.new(0,5); lc.Parent = loadBtn
+        
+        loadBtn.MouseButton1Click:Connect(function()
+            applySnapshot(data)
+            showFeedback("Config '"..cfgName.."' carregada!")
+        end)
+        
+        local delBtn = Instance.new("TextButton")
+        delBtn.Size = UDim2.new(0,32,0,22); delBtn.Position = UDim2.new(1,-36,0.5,-11); delBtn.BackgroundColor3 = Color3.fromRGB(180,50,50); delBtn.Text = "X"; delBtn.TextColor3 = Color3.fromRGB(255,255,255); delBtn.TextSize = 12; delBtn.Font = Enum.Font.GothamBold; delBtn.Parent = row
+        local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(0,5); dc.Parent = delBtn
+        
+        delBtn.MouseButton1Click:Connect(function()
+            local current = getAllConfigs()
+            current[cfgName] = nil
+            writeAllConfigs(current)
+            rebuildConfigList()
+        end)
+    end
+end
+
+rebuildConfigList()
