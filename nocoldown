@@ -13,29 +13,49 @@ local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Cores
+-- =========================================================================
+-- DETECÇÃO DE SCRIPT DUPLICADO
+-- =========================================================================
+local NIGHTHUB_ID = "NightHub_v2_" .. game.PlaceId
+
+if _G[NIGHTHUB_ID] and _G[NIGHTHUB_ID].Active then
+    pcall(function()
+        if _G[NIGHTHUB_ID].Cleanup then
+            _G[NIGHTHUB_ID].Cleanup()
+        end
+    end)
+    task.wait(0.3)
+end
+
+_G[NIGHTHUB_ID] = { Active = true, Cleanup = nil }
+
+-- Cores (Premium Dark Theme)
 local Cores = {
-    Fundo = Color3.fromRGB(54, 54, 60),
-    Header = Color3.fromRGB(83, 165, 235),
-    TabsBg = Color3.fromRGB(48, 48, 54),
-    TabAtiva = Color3.fromRGB(92, 176, 248),
-    TabInativa = Color3.fromRGB(70, 70, 76),
-    Card = Color3.fromRGB(63, 63, 70),
-    TextoPrimario = Color3.fromRGB(248, 248, 250),
-    TextoSecundario = Color3.fromRGB(192, 196, 206),
-    Destaque = Color3.fromRGB(92, 176, 248),
-    SwitchOn = Color3.fromRGB(92, 176, 248),
-    SwitchOff = Color3.fromRGB(100, 102, 108),
-    StartGreen = Color3.fromRGB(76, 175, 80),
-    BindAzul = Color3.fromRGB(92, 176, 248),
+    Fundo = Color3.fromRGB(18, 18, 24),
+    Header = Color3.fromRGB(30, 30, 40),
+    TabsBg = Color3.fromRGB(22, 22, 30),
+    TabAtiva = Color3.fromRGB(99, 102, 241),
+    TabInativa = Color3.fromRGB(38, 38, 50),
+    Card = Color3.fromRGB(28, 28, 38),
+    TextoPrimario = Color3.fromRGB(240, 240, 245),
+    TextoSecundario = Color3.fromRGB(140, 145, 160),
+    Destaque = Color3.fromRGB(99, 102, 241),
+    SwitchOn = Color3.fromRGB(99, 102, 241),
+    SwitchOff = Color3.fromRGB(55, 55, 65),
+    StartGreen = Color3.fromRGB(34, 197, 94),
+    BindAzul = Color3.fromRGB(99, 102, 241),
     -- Cores de raridade para a aba Sell
-    Legendary = Color3.fromRGB(255, 165, 0),
-    Epic = Color3.fromRGB(163, 73, 255),
-    Rare = Color3.fromRGB(0, 112, 221),
-    Uncommon = Color3.fromRGB(30, 180, 80),
-    Ultimate = Color3.fromRGB(255, 0, 255), -- Magenta/Pink para Ultimate
-    Common = Color3.fromRGB(160, 160, 160),
-    SellRed = Color3.fromRGB(220, 50, 50),
+    Legendary = Color3.fromRGB(251, 191, 36),
+    Epic = Color3.fromRGB(168, 85, 247),
+    Rare = Color3.fromRGB(59, 130, 246),
+    Uncommon = Color3.fromRGB(34, 197, 94),
+    Ultimate = Color3.fromRGB(236, 72, 153),
+    Common = Color3.fromRGB(107, 114, 128),
+    SellRed = Color3.fromRGB(239, 68, 68),
+    -- Extras premium
+    Glow = Color3.fromRGB(99, 102, 241),
+    Border = Color3.fromRGB(45, 45, 60),
+    Hover = Color3.fromRGB(35, 35, 48),
 }
 
 local NightHub = {
@@ -44,13 +64,14 @@ local NightHub = {
     FlyAtivo = false,
     NoVFXAtivo = false,
     VelocidadeExtra = true,
-    SpeedMultiplier = 1.5,
+    SpeedMultiplier = 2.0,
     OriginalWalkSpeed = 16,
     DungeonStartCount = 0,
     OcultarNome = false,
     NomePersonalizado = "",
     -- Configs do Void-Stalker Farm
-    FlightSpeed = 27,
+    FlightSpeed = 30,
+    FlySpeed = 35,
     FixedDepth = -15,
     MaxDetectionRange = 500,
     HitboxSize = 115,
@@ -116,10 +137,10 @@ function getCurrentSnapshot()
     return {
         OcultarNome = NightHub.OcultarNome,
         NomePersonalizado = NightHub.NomePersonalizado,
-        SpeedMultiplier = NightHub.SpeedMultiplier,
         VelocidadeExtra = NightHub.VelocidadeExtra,
         NoVFXAtivo = NightHub.NoVFXAtivo,
         FlightSpeed = NightHub.FlightSpeed,
+        FlySpeed = NightHub.FlySpeed,
         FixedDepth = NightHub.FixedDepth,
         MaxDetectionRange = NightHub.MaxDetectionRange,
         HitboxSize = NightHub.HitboxSize,
@@ -147,10 +168,10 @@ function applySnapshot(data)
     -- Primeiro as variáveis de dados
     if data.OcultarNome ~= nil then NightHub.OcultarNome = data.OcultarNome end
     if data.NomePersonalizado ~= nil then NightHub.NomePersonalizado = data.NomePersonalizado end
-    if data.SpeedMultiplier ~= nil then NightHub.SpeedMultiplier = data.SpeedMultiplier end
     if data.VelocidadeExtra ~= nil then NightHub.VelocidadeExtra = data.VelocidadeExtra end
     if data.NoVFXAtivo ~= nil then NightHub.NoVFXAtivo = data.NoVFXAtivo end
     if data.FlightSpeed ~= nil then NightHub.FlightSpeed = data.FlightSpeed end
+    if data.FlySpeed ~= nil then NightHub.FlySpeed = data.FlySpeed end
     if data.FixedDepth ~= nil then NightHub.FixedDepth = data.FixedDepth end
     if data.MaxDetectionRange ~= nil then NightHub.MaxDetectionRange = data.MaxDetectionRange end
     if data.HitboxSize ~= nil then NightHub.HitboxSize = data.HitboxSize end
@@ -241,8 +262,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 520, 0, 450)
-MainFrame.Position = UDim2.new(0.5, -260, 0.5, -225)
+MainFrame.Size = UDim2.new(0, 540, 0, 470)
+MainFrame.Position = UDim2.new(0.5, -270, 0.5, -235)
 MainFrame.BackgroundColor3 = Cores.Fundo
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
@@ -250,54 +271,78 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.CornerRadius = UDim.new(0, 12)
 MainCorner.Parent = MainFrame
 
 local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Cores.Header
+MainStroke.Color = Cores.Border
 MainStroke.Thickness = 1
-MainStroke.Transparency = 0.35
+MainStroke.Transparency = 0.5
 MainStroke.Parent = MainFrame
+
+-- Glow externo sutil
+local GlowFrame = Instance.new("Frame")
+GlowFrame.Size = UDim2.new(1, 8, 1, 8)
+GlowFrame.Position = UDim2.new(0, -4, 0, -4)
+GlowFrame.BackgroundTransparency = 0.85
+GlowFrame.BackgroundColor3 = Cores.Glow
+GlowFrame.BorderSizePixel = 0
+GlowFrame.ZIndex = -1
+GlowFrame.Parent = MainFrame
+local GlowCorner = Instance.new("UICorner")
+GlowCorner.CornerRadius = UDim.new(0, 14)
+GlowCorner.Parent = GlowFrame
 
 MainFrame.MouseEnter:Connect(function() UIHovered = true end)
 MainFrame.MouseLeave:Connect(function() UIHovered = false end)
 
 -- Header
 local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 28)
+Header.Size = UDim2.new(1, 0, 0, 32)
 Header.BackgroundColor3 = Cores.Header
 Header.BorderSizePixel = 0
 Header.Parent = MainFrame
 
 local HeaderCorner = Instance.new("UICorner")
-HeaderCorner.CornerRadius = UDim.new(0, 8)
+HeaderCorner.CornerRadius = UDim.new(0, 12)
 HeaderCorner.Parent = Header
 
 local HeaderCover = Instance.new("Frame")
-HeaderCover.Size = UDim2.new(1, 0, 0, 8)
-HeaderCover.Position = UDim2.new(0, 0, 1, -8)
+HeaderCover.Size = UDim2.new(1, 0, 0, 12)
+HeaderCover.Position = UDim2.new(0, 0, 1, -12)
 HeaderCover.BackgroundColor3 = Cores.Header
 HeaderCover.BorderSizePixel = 0
 HeaderCover.Parent = Header
 
+-- Linha de destaque no header
+local HeaderAccent = Instance.new("Frame")
+HeaderAccent.Size = UDim2.new(1, 0, 0, 2)
+HeaderAccent.Position = UDim2.new(0, 0, 1, -2)
+HeaderAccent.BackgroundColor3 = Cores.Destaque
+HeaderAccent.BorderSizePixel = 0
+HeaderAccent.Parent = Header
+
 local Logo = Instance.new("TextLabel")
 Logo.Size = UDim2.new(0, 280, 1, 0)
-Logo.Position = UDim2.new(0, 10, 0, 0)
+Logo.Position = UDim2.new(0, 12, 0, 0)
 Logo.BackgroundTransparency = 1
 Logo.RichText = true
-Logo.Text = "Dungeon Quest: <font color='#8A2BE2'>Night Hub</font>"
-Logo.TextColor3 = Color3.fromRGB(246, 246, 248)
-Logo.TextSize = 14
-Logo.Font = Enum.Font.GothamSemibold
+Logo.Text = "Dungeon Quest  <font color='#6366F1'>Night Hub</font>"
+Logo.TextColor3 = Color3.fromRGB(240, 240, 245)
+Logo.TextSize = 13
+Logo.Font = Enum.Font.GothamBold
 Logo.TextXAlignment = Enum.TextXAlignment.Left
 Logo.Parent = Header
 
 local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0, 24, 0, 24)
-CloseButton.Position = UDim2.new(1, -30, 0, 2)
-CloseButton.BackgroundTransparency = 1
+CloseButton.Size = UDim2.new(0, 26, 0, 26)
+CloseButton.Position = UDim2.new(1, -32, 0, 3)
+CloseButton.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
 CloseButton.Text = ""
 CloseButton.Parent = Header
+local CloseBtnCorner = Instance.new("UICorner")
+CloseBtnCorner.CornerRadius = UDim.new(0, 6)
+CloseBtnCorner.Parent = CloseButton
 
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
@@ -305,14 +350,14 @@ end)
 
 -- Tabs
 local TabContainer = Instance.new("Frame")
-TabContainer.Size = UDim2.new(0, 128, 1, -28)
-TabContainer.Position = UDim2.new(0, 0, 0, 28)
+TabContainer.Size = UDim2.new(0, 130, 1, -34)
+TabContainer.Position = UDim2.new(0, 0, 0, 34)
 TabContainer.BackgroundColor3 = Cores.TabsBg
 TabContainer.BorderSizePixel = 0
 TabContainer.Parent = MainFrame
 
 local TabCorner = Instance.new("UICorner")
-TabCorner.CornerRadius = UDim.new(0, 8)
+TabCorner.CornerRadius = UDim.new(0, 0)
 TabCorner.Parent = TabContainer
 
 local TabPadding = Instance.new("UIPadding")
@@ -322,15 +367,15 @@ TabPadding.PaddingRight = UDim.new(0, 8)
 TabPadding.Parent = TabContainer
 
 local UIListLayout_Tabs = Instance.new("UIListLayout")
-UIListLayout_Tabs.Padding = UDim.new(0, 6)
+UIListLayout_Tabs.Padding = UDim.new(0, 4)
 UIListLayout_Tabs.FillDirection = Enum.FillDirection.Vertical
 UIListLayout_Tabs.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIListLayout_Tabs.VerticalAlignment = Enum.VerticalAlignment.Top
 UIListLayout_Tabs.Parent = TabContainer
 
 local ContentContainer = Instance.new("Frame")
-ContentContainer.Size = UDim2.new(1, -138, 1, -28)
-ContentContainer.Position = UDim2.new(0, 132, 0, 28)
+ContentContainer.Size = UDim2.new(1, -140, 1, -34)
+ContentContainer.Position = UDim2.new(0, 134, 0, 34)
 ContentContainer.BackgroundColor3 = Cores.Fundo
 ContentContainer.BorderSizePixel = 0
 ContentContainer.Parent = MainFrame
@@ -359,16 +404,16 @@ end
 
 function CreateTab(name)
     local tabButton = Instance.new("TextButton")
-    tabButton.Size = UDim2.new(1, -16, 0, 28)
+    tabButton.Size = UDim2.new(1, -16, 0, 30)
     tabButton.BackgroundColor3 = Cores.TabInativa
     tabButton.Text = name
     tabButton.TextColor3 = Cores.TextoSecundario
     tabButton.TextSize = 12
-    tabButton.Font = Enum.Font.GothamSemibold
+    tabButton.Font = Enum.Font.GothamBold
     tabButton.Parent = TabContainer
     
     local tabCorner = Instance.new("UICorner")
-    tabCorner.CornerRadius = UDim.new(0, 6)
+    tabCorner.CornerRadius = UDim.new(0, 8)
     tabCorner.Parent = tabButton
     
     local contentPage = Instance.new("ScrollingFrame")
@@ -392,6 +437,8 @@ function CreateTab(name)
     local pagePadding = Instance.new("UIPadding")
     pagePadding.PaddingTop = UDim.new(0, 10)
     pagePadding.PaddingBottom = UDim.new(0, 10)
+    pagePadding.PaddingLeft = UDim.new(0, 4)
+    pagePadding.PaddingRight = UDim.new(0, 4)
     pagePadding.Parent = contentPage
     
     ContentPages[name] = { Button = tabButton, Page = contentPage }
@@ -412,26 +459,29 @@ end
 
 function CreateSection(parent, title)
     local sectionFrame = Instance.new("Frame")
-    sectionFrame.Size = UDim2.new(0.94, 0, 0, 26)
+    sectionFrame.Size = UDim2.new(0.96, 0, 0, 28)
     sectionFrame.BackgroundTransparency = 1
     sectionFrame.LayoutOrder = #parent:GetChildren()
     sectionFrame.Parent = parent
     
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(0, 3, 0, 14)
-    bar.Position = UDim2.new(0, 0, 0, 6)
+    bar.Position = UDim2.new(0, 0, 0, 7)
     bar.BackgroundColor3 = Cores.Destaque
     bar.BorderSizePixel = 0
     bar.Parent = sectionFrame
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 2)
+    barCorner.Parent = bar
     
     local sectionLabel = Instance.new("TextLabel")
     sectionLabel.Size = UDim2.new(1, -10, 1, 0)
     sectionLabel.Position = UDim2.new(0, 10, 0, 0)
     sectionLabel.BackgroundTransparency = 1
-    sectionLabel.Text = title
+    sectionLabel.Text = string.upper(title)
     sectionLabel.TextColor3 = Cores.Destaque
-    sectionLabel.TextSize = 12
-    sectionLabel.Font = Enum.Font.GothamBlack
+    sectionLabel.TextSize = 11
+    sectionLabel.Font = Enum.Font.GothamBold
     sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
     sectionLabel.Parent = sectionFrame
     
@@ -440,14 +490,14 @@ end
 
 function CreateToggleWithBind(parent, name, default, bindDefault, toggleKey, callback, bindCallback)
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(0.94, 0, 0, 48)
+    toggleFrame.Size = UDim2.new(0.96, 0, 0, 50)
     toggleFrame.BackgroundColor3 = Cores.Card
     toggleFrame.BorderSizePixel = 0
     toggleFrame.LayoutOrder = #parent:GetChildren()
     toggleFrame.Parent = parent
     
     local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.CornerRadius = UDim.new(0, 10)
     toggleCorner.Parent = toggleFrame
     
     local functionLabel = Instance.new("TextLabel")
@@ -463,13 +513,13 @@ function CreateToggleWithBind(parent, name, default, bindDefault, toggleKey, cal
     
     local controlsContainer = Instance.new("Frame")
     controlsContainer.Size = UDim2.new(1, -24, 0, 20)
-    controlsContainer.Position = UDim2.new(0, 12, 0, 24)
+    controlsContainer.Position = UDim2.new(0, 12, 0, 26)
     controlsContainer.BackgroundTransparency = 1
     controlsContainer.Parent = toggleFrame
     
     local switchBg = Instance.new("Frame")
-    switchBg.Size = UDim2.new(0, 38, 0, 20)
-    switchBg.Position = UDim2.new(0, 0, 0.5, -10)
+    switchBg.Size = UDim2.new(0, 40, 0, 22)
+    switchBg.Position = UDim2.new(0, 0, 0.5, -11)
     switchBg.BackgroundColor3 = default and Cores.SwitchOn or Cores.SwitchOff
     switchBg.BorderSizePixel = 0
     switchBg.Parent = controlsContainer
@@ -479,8 +529,8 @@ function CreateToggleWithBind(parent, name, default, bindDefault, toggleKey, cal
     switchCorner.Parent = switchBg
     
     local switchKnob = Instance.new("Frame")
-    switchKnob.Size = UDim2.new(0, 16, 0, 16)
-    switchKnob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    switchKnob.Size = UDim2.new(0, 18, 0, 18)
+    switchKnob.Position = default and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
     switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchKnob.BorderSizePixel = 0
     switchKnob.Parent = switchBg
@@ -539,14 +589,14 @@ end
 
 function CreateSlider(parent, name, min, max, default, callback)
     local sliderFrame = Instance.new("Frame")
-    sliderFrame.Size = UDim2.new(0.94, 0, 0, 48)
+    sliderFrame.Size = UDim2.new(0.96, 0, 0, 50)
     sliderFrame.BackgroundColor3 = Cores.Card
     sliderFrame.BorderSizePixel = 0
     sliderFrame.LayoutOrder = #parent:GetChildren()
     sliderFrame.Parent = parent
     
     local sliderCorner = Instance.new("UICorner")
-    sliderCorner.CornerRadius = UDim.new(0, 8)
+    sliderCorner.CornerRadius = UDim.new(0, 10)
     sliderCorner.Parent = sliderFrame
     
     local valueLabel = Instance.new("TextLabel")
@@ -561,9 +611,9 @@ function CreateSlider(parent, name, min, max, default, callback)
     valueLabel.Parent = sliderFrame
     
     local sliderBar = Instance.new("Frame")
-    sliderBar.Size = UDim2.new(1, -24, 0, 5)
+    sliderBar.Size = UDim2.new(1, -24, 0, 6)
     sliderBar.Position = UDim2.new(0, 12, 0, 32)
-    sliderBar.BackgroundColor3 = Cores.Fundo
+    sliderBar.BackgroundColor3 = Cores.Border
     sliderBar.BorderSizePixel = 0
     sliderBar.Parent = sliderFrame
     
@@ -582,8 +632,8 @@ function CreateSlider(parent, name, min, max, default, callback)
     fillCorner.Parent = sliderFill
     
     local sliderKnob = Instance.new("Frame")
-    sliderKnob.Size = UDim2.new(0, 14, 0, 14)
-    sliderKnob.Position = UDim2.new((default - min) / (max - min), -7, 0, -4)
+    sliderKnob.Size = UDim2.new(0, 16, 0, 16)
+    sliderKnob.Position = UDim2.new((default - min) / (max - min), -8, 0.5, -8)
     sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     sliderKnob.BorderSizePixel = 0
     sliderKnob.Parent = sliderBar
@@ -626,14 +676,14 @@ end
 
 local function CreateToggle(parent, name, default, toggleKey, callback)
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(0.94, 0, 0, 36)
+    toggleFrame.Size = UDim2.new(0.96, 0, 0, 40)
     toggleFrame.BackgroundColor3 = Cores.Card
     toggleFrame.BorderSizePixel = 0
     toggleFrame.LayoutOrder = #parent:GetChildren()
     toggleFrame.Parent = parent
     
     local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.CornerRadius = UDim.new(0, 10)
     toggleCorner.Parent = toggleFrame
     
     local functionLabel = Instance.new("TextLabel")
@@ -648,8 +698,8 @@ local function CreateToggle(parent, name, default, toggleKey, callback)
     functionLabel.Parent = toggleFrame
     
     local switchBg = Instance.new("Frame")
-    switchBg.Size = UDim2.new(0, 38, 0, 20)
-    switchBg.Position = UDim2.new(1, -50, 0.5, -10)
+    switchBg.Size = UDim2.new(0, 40, 0, 22)
+    switchBg.Position = UDim2.new(1, -52, 0.5, -11)
     switchBg.BackgroundColor3 = default and Cores.SwitchOn or Cores.SwitchOff
     switchBg.BorderSizePixel = 0
     switchBg.Parent = toggleFrame
@@ -659,8 +709,8 @@ local function CreateToggle(parent, name, default, toggleKey, callback)
     switchCorner.Parent = switchBg
     
     local switchKnob = Instance.new("Frame")
-    switchKnob.Size = UDim2.new(0, 16, 0, 16)
-    switchKnob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    switchKnob.Size = UDim2.new(0, 18, 0, 18)
+    switchKnob.Position = default and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
     switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchKnob.BorderSizePixel = 0
     switchKnob.Parent = switchBg
@@ -691,14 +741,14 @@ end
 
 function CreateTextBox(parent, name, placeholder, default, callback)
     local inputFrame = Instance.new("Frame")
-    inputFrame.Size = UDim2.new(0.94, 0, 0, 56)
+    inputFrame.Size = UDim2.new(0.96, 0, 0, 58)
     inputFrame.BackgroundColor3 = Cores.Card
     inputFrame.BorderSizePixel = 0
     inputFrame.LayoutOrder = #parent:GetChildren()
     inputFrame.Parent = parent
     
     local inputCorner = Instance.new("UICorner")
-    inputCorner.CornerRadius = UDim.new(0, 8)
+    inputCorner.CornerRadius = UDim.new(0, 10)
     inputCorner.Parent = inputFrame
     
     local titleLabel = Instance.new("TextLabel")
@@ -713,9 +763,9 @@ function CreateTextBox(parent, name, placeholder, default, callback)
     titleLabel.Parent = inputFrame
     
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -24, 0, 22)
-    textBox.Position = UDim2.new(0, 12, 0, 26)
-    textBox.BackgroundColor3 = Cores.Fundo
+    textBox.Size = UDim2.new(1, -24, 0, 24)
+    textBox.Position = UDim2.new(0, 12, 0, 28)
+    textBox.BackgroundColor3 = Cores.Border
     textBox.BorderSizePixel = 0
     textBox.Text = default
     textBox.PlaceholderText = placeholder
@@ -728,12 +778,12 @@ function CreateTextBox(parent, name, placeholder, default, callback)
     textBox.Parent = inputFrame
     
     local boxCorner = Instance.new("UICorner")
-    boxCorner.CornerRadius = UDim.new(0, 5)
+    boxCorner.CornerRadius = UDim.new(0, 6)
     boxCorner.Parent = textBox
     
     local boxPadding = Instance.new("UIPadding")
-    boxPadding.PaddingLeft = UDim.new(0, 8)
-    boxPadding.PaddingRight = UDim.new(0, 8)
+    boxPadding.PaddingLeft = UDim.new(0, 10)
+    boxPadding.PaddingRight = UDim.new(0, 10)
     boxPadding.Parent = textBox
     
     textBox.FocusLost:Connect(function(enterPressed)
@@ -747,14 +797,14 @@ local counterLabel
 
 function CreateDungeonButton(parent)
     local buttonFrame = Instance.new("Frame")
-    buttonFrame.Size = UDim2.new(0.94, 0, 0, 80)
+    buttonFrame.Size = UDim2.new(0.96, 0, 0, 85)
     buttonFrame.BackgroundColor3 = Cores.Card
     buttonFrame.BorderSizePixel = 0
     buttonFrame.LayoutOrder = #parent:GetChildren()
     buttonFrame.Parent = parent
 
     local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.CornerRadius = UDim.new(0, 10)
     buttonCorner.Parent = buttonFrame
 
     local titleLabel = Instance.new("TextLabel")
@@ -769,18 +819,18 @@ function CreateDungeonButton(parent)
     titleLabel.Parent = buttonFrame
 
     local startButton = Instance.new("TextButton")
-    startButton.Size = UDim2.new(1, -24, 0, 24)
-    startButton.Position = UDim2.new(0, 12, 0, 30)
+    startButton.Size = UDim2.new(1, -24, 0, 28)
+    startButton.Position = UDim2.new(0, 12, 0, 32)
     startButton.BackgroundColor3 = Cores.StartGreen
     startButton.Text = "START DUNGEON"
     startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    startButton.TextSize = 16
+    startButton.TextSize = 14
     startButton.Font = Enum.Font.GothamBold
     startButton.TextStrokeTransparency = 1
     startButton.Parent = buttonFrame
 
     local startCorner = Instance.new("UICorner")
-    startCorner.CornerRadius = UDim.new(0, 6)
+    startCorner.CornerRadius = UDim.new(0, 8)
     startCorner.Parent = startButton
 
     local bindLabel = Instance.new("TextLabel")
@@ -796,7 +846,7 @@ function CreateDungeonButton(parent)
 
     counterLabel = Instance.new("TextLabel")
     counterLabel.Size = UDim2.new(0, 120, 0, 18)
-    counterLabel.Position = UDim2.new(0, 12, 0, 55)
+    counterLabel.Position = UDim2.new(0, 12, 0, 62)
     counterLabel.BackgroundTransparency = 1
     counterLabel.Text = "Runs: 0"
     counterLabel.TextColor3 = Cores.TextoSecundario
@@ -837,19 +887,19 @@ end
 
 function CreateAutoRetryToggle(parent)
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(0.94, 0, 0, 52)
+    toggleFrame.Size = UDim2.new(0.96, 0, 0, 50)
     toggleFrame.BackgroundColor3 = Cores.Card
     toggleFrame.BorderSizePixel = 0
     toggleFrame.LayoutOrder = #parent:GetChildren()
     toggleFrame.Parent = parent
 
     local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.CornerRadius = UDim.new(0, 10)
     toggleCorner.Parent = toggleFrame
 
     local functionLabel = Instance.new("TextLabel")
     functionLabel.Size = UDim2.new(0.65, 0, 0, 22)
-    functionLabel.Position = UDim2.new(0, 12, 0, 15)
+    functionLabel.Position = UDim2.new(0, 12, 0, 14)
     functionLabel.BackgroundTransparency = 1
     functionLabel.Text = "Auto Retry Ativo"
     functionLabel.TextColor3 = Cores.TextoPrimario
@@ -859,16 +909,16 @@ function CreateAutoRetryToggle(parent)
     functionLabel.Parent = toggleFrame
 
     local switchBg = Instance.new("Frame")
-    switchBg.Size = UDim2.new(0, 38, 0, 20)
-    switchBg.Position = UDim2.new(1, -50, 0.5, -10)
+    switchBg.Size = UDim2.new(0, 40, 0, 22)
+    switchBg.Position = UDim2.new(1, -52, 0.5, -11)
     switchBg.BackgroundColor3 = NightHub.AutoRetryAtivo and Cores.SwitchOn or Cores.SwitchOff
     switchBg.BorderSizePixel = 0
     switchBg.Parent = toggleFrame
     local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = switchBg
 
     local switchKnob = Instance.new("Frame")
-    switchKnob.Size = UDim2.new(0, 16, 0, 16)
-    switchKnob.Position = NightHub.AutoRetryAtivo and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    switchKnob.Size = UDim2.new(0, 18, 0, 18)
+    switchKnob.Position = NightHub.AutoRetryAtivo and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
     switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchKnob.BorderSizePixel = 0
     switchKnob.Parent = switchBg
@@ -877,8 +927,8 @@ function CreateAutoRetryToggle(parent)
     UIToggles["AutoRetry"] = { SwitchBg = switchBg, SwitchKnob = switchKnob }
 
     local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0, 38, 0, 20)
-    toggleBtn.Position = UDim2.new(1, -50, 0.5, -10)
+    toggleBtn.Size = UDim2.new(0, 40, 0, 22)
+    toggleBtn.Position = UDim2.new(1, -52, 0.5, -11)
     toggleBtn.BackgroundTransparency = 1
     toggleBtn.Text = ""
     toggleBtn.Parent = toggleFrame
@@ -901,6 +951,7 @@ end
 -- =========================================================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+    if waitingForKey then return end
     
     if input.UserInputType == Enum.UserInputType.Keyboard then
         local key = input.KeyCode
@@ -1035,7 +1086,7 @@ function iniciarFly()
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
             
             if moveDir.Magnitude > 0 then
-                bv.Velocity = moveDir.Unit * NightHub.FlightSpeed
+                bv.Velocity = moveDir.Unit * NightHub.FlySpeed
             else
                 bv.Velocity = Vector3.new(0, 0.1, 0)
             end
@@ -1282,21 +1333,22 @@ end
 -- =========================================================================
 function ativarVelocidadeExtra()
     if Connections.SpeedLoop then Connections.SpeedLoop:Disconnect() end
-    Connections.SpeedLoop = RunService.Heartbeat:Connect(function()
-        if not NightHub.VelocidadeExtra then return end
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("Humanoid") then
-                local speed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
-                if speed > 25 then speed = 25 end
-                char.Humanoid.WalkSpeed = speed
-            end
-        end)
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local humanoid = char.Humanoid
+            humanoid.WalkSpeed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
+            Connections.SpeedLoop = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if NightHub.VelocidadeExtra and humanoid.WalkSpeed ~= NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier then
+                    humanoid.WalkSpeed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
+                end
+            end)
+        end
     end)
 end
 
 function desativarVelocidadeExtra()
-    if Connections.SpeedLoop then Connections.SpeedLoop:Disconnect(); Connections.SpeedLoop = nil end
+    Connections.SpeedLoop = nil
     pcall(function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
@@ -1321,14 +1373,19 @@ function applyToTextLabel(label)
                     string.upper(txt) == string.upper(defaultName)
                     
     if isMatch then
-        local data = { OriginalText = txt, Connection = nil }
+        local data = { OriginalText = txt, Connection = nil, Updating = false }
         MatchedTextLabels[label] = data
         local function check()
+            if data.Updating then return end
             local currentText = label.Text
             local targetText = data.OriginalText
             if NightHub.OcultarNome then targetText = ""
             elseif NightHub.NomePersonalizado ~= "" then targetText = NightHub.NomePersonalizado end
-            if currentText ~= targetText then label.Text = targetText end
+            if currentText ~= targetText then
+                data.Updating = true
+                label.Text = targetText
+                data.Updating = false
+            end
         end
         data.Connection = label:GetPropertyChangedSignal("Text"):Connect(check)
         check()
@@ -1338,10 +1395,15 @@ end
 function refreshAllTextLabels()
     for label, data in pairs(MatchedTextLabels) do
         pcall(function()
+            if data.Updating then return end
             local targetText = data.OriginalText
             if NightHub.OcultarNome then targetText = ""
             elseif NightHub.NomePersonalizado ~= "" then targetText = NightHub.NomePersonalizado end
-            if label.Text ~= targetText then label.Text = targetText end
+            if label.Text ~= targetText then
+                data.Updating = true
+                label.Text = targetText
+                data.Updating = false
+            end
         end)
     end
 end
@@ -1365,7 +1427,6 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         NightHub.OriginalWalkSpeed = char.Humanoid.WalkSpeed
         if NightHub.VelocidadeExtra then
             local speed = NightHub.OriginalWalkSpeed * NightHub.SpeedMultiplier
-            if speed > 25 then speed = 25 end
             char.Humanoid.WalkSpeed = speed
         end
     end
@@ -1396,7 +1457,7 @@ CreateToggleWithBind(CombatPage, "Spammer Automatico", false, Binds.Spammer, "Sp
 )
 
 CreateSection(CombatPage, "OTIMIZACAO")
-CreateToggleWithBind(CombatPage, "Velocidade Extra (1.5x)", NightHub.VelocidadeExtra, Binds.Speed, "Speed",
+CreateToggleWithBind(CombatPage, "Velocidade Extra (2.0x)", NightHub.VelocidadeExtra, Binds.Speed, "Speed",
     function(value) NightHub.VelocidadeExtra = value; if value then ativarVelocidadeExtra() else desativarVelocidadeExtra() end end,
     function(bind) Binds.Speed = bind end
 )
@@ -1413,6 +1474,7 @@ CreateToggleWithBind(FarmPage, "Fly Manual (WASD)", false, Binds.Fly, "Fly",
     function(value) NightHub.FlyAtivo = value; if value then iniciarFly() else pararFly() end end,
     function(bind) Binds.Fly = bind end
 )
+CreateSlider(FarmPage, "Velocidade do Fly", 10, 35, NightHub.FlySpeed, function(value) NightHub.FlySpeed = value end)
 
 CreateSection(FarmPage, "VOID-STALKER FARM")
 CreateToggleWithBind(FarmPage, "Auto Farm (Normal > VoidShade)", false, Binds.Farm, "Farm",
@@ -1420,7 +1482,7 @@ CreateToggleWithBind(FarmPage, "Auto Farm (Normal > VoidShade)", false, Binds.Fa
     function(bind) Binds.Farm = bind end
 )
 
-CreateSlider(FarmPage, "Velocidade de Voo", 10, 50, NightHub.FlightSpeed, function(value) NightHub.FlightSpeed = value end)
+CreateSlider(FarmPage, "Velocidade do Farm", 10, 30, NightHub.FlightSpeed, function(value) NightHub.FlightSpeed = value end)
 CreateSlider(FarmPage, "Profundidade", -30, -5, NightHub.FixedDepth, function(value) NightHub.FixedDepth = value end)
 CreateSlider(FarmPage, "Alcance de Detecção", 100, 1000, NightHub.MaxDetectionRange, function(value) NightHub.MaxDetectionRange = value end)
 CreateSlider(FarmPage, "Tamanho do Hitbox", 50, 200, NightHub.HitboxSize, function(value) NightHub.HitboxSize = value end)
@@ -1519,12 +1581,12 @@ CreateSection(SellPage, "AUTO SELL")
 -- Card do toggle principal
 do
     local mainCard = Instance.new("Frame")
-    mainCard.Size = UDim2.new(0.94, 0, 0, 52)
+    mainCard.Size = UDim2.new(0.96, 0, 0, 55)
     mainCard.BackgroundColor3 = Cores.Card
     mainCard.BorderSizePixel = 0
     mainCard.LayoutOrder = #SellPage:GetChildren()
     mainCard.Parent = SellPage
-    local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 8); mc.Parent = mainCard
+    local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 10); mc.Parent = mainCard
 
     local mainLabel = Instance.new("TextLabel")
     mainLabel.Size = UDim2.new(0.65, 0, 0, 22)
@@ -1549,16 +1611,16 @@ do
     sellStatusLabel.Parent = mainCard
 
     local switchBg = Instance.new("Frame")
-    switchBg.Size = UDim2.new(0, 38, 0, 20)
-    switchBg.Position = UDim2.new(1, -50, 0.5, -10)
+    switchBg.Size = UDim2.new(0, 40, 0, 22)
+    switchBg.Position = UDim2.new(1, -52, 0.5, -11)
     switchBg.BackgroundColor3 = Cores.SwitchOff
     switchBg.BorderSizePixel = 0
     switchBg.Parent = mainCard
     local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = switchBg
 
     local switchKnob = Instance.new("Frame")
-    switchKnob.Size = UDim2.new(0, 16, 0, 16)
-    switchKnob.Position = UDim2.new(0, 2, 0.5, -8)
+    switchKnob.Size = UDim2.new(0, 18, 0, 18)
+    switchKnob.Position = UDim2.new(0, 2, 0.5, -9)
     switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchKnob.BorderSizePixel = 0
     switchKnob.Parent = switchBg
@@ -1859,6 +1921,80 @@ function showFeedback(msg, isError)
     task.delay(2.5, function() configFeedback.Text = "" end)
 end
 
+-- =========================================================================
+-- KEYBINDS - TROCAR BIND DO MENU
+-- =========================================================================
+CreateSection(ConfigPage, "KEYBINDS")
+
+local KeybindNames = {
+    { Key = "ToggleUI", Label = "Abrir/Fechar Menu" },
+    { Key = "Spammer", Label = "Spammer" },
+    { Key = "Farm", Label = "Farm" },
+    { Key = "Fly", Label = "Fly" },
+    { Key = "NoVFX", Label = "No VFX" },
+    { Key = "Speed", Label = "Velocidade" },
+    { Key = "StartDungeon", Label = "Iniciar Dungeon" },
+}
+
+local waitingForKey = nil
+
+for _, bind in ipairs(KeybindNames) do
+    local bindFrame = Instance.new("Frame")
+    bindFrame.Size = UDim2.new(0.96, 0, 0, 42)
+    bindFrame.BackgroundColor3 = Cores.Card
+    bindFrame.BorderSizePixel = 0
+    bindFrame.LayoutOrder = #ConfigPage:GetChildren()
+    bindFrame.Parent = ConfigPage
+    local bfc = Instance.new("UICorner"); bfc.CornerRadius = UDim.new(0, 10); bfc.Parent = bindFrame
+
+    local bindLabel = Instance.new("TextLabel")
+    bindLabel.Size = UDim2.new(0.55, 0, 1, 0)
+    bindLabel.Position = UDim2.new(0, 12, 0, 0)
+    bindLabel.BackgroundTransparency = 1
+    bindLabel.Text = bind.Label
+    bindLabel.TextColor3 = Cores.TextoPrimario
+    bindLabel.TextSize = 13
+    bindLabel.Font = Enum.Font.GothamBold
+    bindLabel.TextXAlignment = Enum.TextXAlignment.Left
+    bindLabel.Parent = bindFrame
+
+    local bindBtn = Instance.new("TextButton")
+    bindBtn.Size = UDim2.new(0, 50, 0, 26)
+    bindBtn.Position = UDim2.new(1, -62, 0.5, -13)
+    bindBtn.BackgroundColor3 = Cores.BindAzul
+    bindBtn.Text = Binds[bind.Key] or "?"
+    bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bindBtn.TextSize = 14
+    bindBtn.Font = Enum.Font.GothamBold
+    bindBtn.AutoButtonColor = false
+    bindBtn.Parent = bindFrame
+    local bbc = Instance.new("UICorner"); bbc.CornerRadius = UDim.new(0, 8); bbc.Parent = bindBtn
+
+    bindBtn.MouseButton1Click:Connect(function()
+        waitingForKey = bind.Key
+        bindBtn.Text = "..."
+        bindBtn.BackgroundColor3 = Cores.Destaque
+    end)
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if waitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
+        local keyName = input.KeyCode.Name
+        Binds[waitingForKey] = keyName
+        
+        -- Atualiza visualmente o botão
+        for _, child in ipairs(ConfigPage:GetDescendants()) do
+            if child:IsA("TextButton") and child.Text == "..." then
+                child.Text = keyName
+                child.BackgroundColor3 = Cores.BindAzul
+            end
+        end
+        
+        showFeedback("Bind atualizado: " .. keyName)
+        waitingForKey = nil
+    end
+end)
+
 local rebuildConfigList
 rebuildConfigList = function()
     for _, child in ipairs(configListSection:GetChildren()) do if not child:IsA("UIListLayout") then child:Destroy() end end
@@ -1969,59 +2105,32 @@ task.spawn(function()
     NightHub.OriginalWalkSpeed = LocalPlayer.Character.Humanoid.WalkSpeed
     if NightHub.VelocidadeExtra then ativarVelocidadeExtra() end
 end)
+
+-- =========================================================================
+-- CLEANUP FUNCTION PARA SCRIPT DUPLICADO
+-- =========================================================================
+_G[NIGHTHUB_ID].Cleanup = function()
+    -- Desativa todas as funções
+    pcall(function() if NightHub.SpammerAtivo then pararSpammer() end end)
+    pcall(function() if NightHub.FlyAtivo then pararFly() end end)
+    pcall(function() if NightHub.FarmAtivo then pararFarm() end end)
+    pcall(function() if NightHub.NoVFXAtivo then desativarNoVFX() end end)
+    pcall(function() if NightHub.VelocidadeExtra then desativarVelocidadeExtra() end end)
+    
+    -- Desconecta todas as conexões
+    for _, conn in ipairs(Connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    Connections = {}
+    
+    -- Remove a GUI
+    pcall(function() ScreenGui:Destroy() end)
+    
+    -- Marca como inativo
+    _G[NIGHTHUB_ID].Active = false
+end
+
 print("Night Hub + Void-Stalker Farm + Fly Manual + Auto Sell ativado com sucesso!")
 print("Abas: Combate | Farm | Dungeon | Sell | Profile | Config")
 print("Binds: Spammer=R | Farm=G | Fly=F | NoVFX=H | Speed=J | UI=K | Dungeon=L")
 
--- =========================================================================
--- SISTEMA DE CONFIGURAÇÕES (DEFINIDO NO FINAL PARA GARANTIR QUE TODAS AS FUNÇÕES EXISTAM)
--- =========================================================================
-
-saveConfigBtn.MouseButton1Click:Connect(function()
-    local name = configNameInput.Text
-    if name == "" then showFeedback("Digite um nome!", true) return end
-    local configs = getAllConfigs()
-    configs[name] = getCurrentSnapshot()
-    writeAllConfigs(configs)
-    showFeedback("Config '"..name.."' salva!")
-    rebuildConfigList()
-end)
-
-rebuildConfigList = function()
-    for _, child in ipairs(configListSection:GetChildren()) do if not child:IsA("UIListLayout") then child:Destroy() end end
-    local configs = getAllConfigs()
-    for cfgName, data in pairs(configs) do
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, 0, 0, 32)
-        row.BackgroundColor3 = Cores.Card
-        row.BorderSizePixel = 0
-        row.Parent = configListSection
-        local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(0,7); rc.Parent = row
-        
-        local nameTag = Instance.new("TextLabel")
-        nameTag.Size = UDim2.new(1,-80,1,0); nameTag.Position = UDim2.new(0,10,0,0); nameTag.BackgroundTransparency = 1
-        nameTag.Text = cfgName; nameTag.TextColor3 = Cores.TextoPrimario; nameTag.TextSize = 12; nameTag.Font = Enum.Font.GothamSemibold; nameTag.TextXAlignment = Enum.TextXAlignment.Left; nameTag.Parent = row
-        
-        local loadBtn = Instance.new("TextButton")
-        loadBtn.Size = UDim2.new(0,36,0,22); loadBtn.Position = UDim2.new(1,-76,0.5,-11); loadBtn.BackgroundColor3 = Cores.BindAzul; loadBtn.Text = "Load"; loadBtn.TextColor3 = Color3.fromRGB(255,255,255); loadBtn.TextSize = 11; loadBtn.Font = Enum.Font.GothamBold; loadBtn.Parent = row
-        local lc = Instance.new("UICorner"); lc.CornerRadius = UDim.new(0,5); lc.Parent = loadBtn
-        
-        loadBtn.MouseButton1Click:Connect(function()
-            applySnapshot(data)
-            showFeedback("Config '"..cfgName.."' carregada!")
-        end)
-        
-        local delBtn = Instance.new("TextButton")
-        delBtn.Size = UDim2.new(0,32,0,22); delBtn.Position = UDim2.new(1,-36,0.5,-11); delBtn.BackgroundColor3 = Color3.fromRGB(180,50,50); delBtn.Text = "X"; delBtn.TextColor3 = Color3.fromRGB(255,255,255); delBtn.TextSize = 12; delBtn.Font = Enum.Font.GothamBold; delBtn.Parent = row
-        local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(0,5); dc.Parent = delBtn
-        
-        delBtn.MouseButton1Click:Connect(function()
-            local current = getAllConfigs()
-            current[cfgName] = nil
-            writeAllConfigs(current)
-            rebuildConfigList()
-        end)
-    end
-end
-
-rebuildConfigList()
