@@ -62,6 +62,7 @@ local NightHub = {
     SpammerAtivo = false,
     FarmAtivo = false,
     FlyAtivo = false,
+    OrbitMode = false,
     NoVFXAtivo = false,
     VelocidadeExtra = true,
     SpeedMultiplier = 2.0,
@@ -141,6 +142,7 @@ function getCurrentSnapshot()
         NoVFXAtivo = NightHub.NoVFXAtivo,
         FlightSpeed = NightHub.FlightSpeed,
         FlySpeed = NightHub.FlySpeed,
+        OrbitMode = NightHub.OrbitMode,
         FixedDepth = NightHub.FixedDepth,
         MaxDetectionRange = NightHub.MaxDetectionRange,
         HitboxSize = NightHub.HitboxSize,
@@ -172,6 +174,7 @@ function applySnapshot(data)
     if data.NoVFXAtivo ~= nil then NightHub.NoVFXAtivo = data.NoVFXAtivo end
     if data.FlightSpeed ~= nil then NightHub.FlightSpeed = data.FlightSpeed end
     if data.FlySpeed ~= nil then NightHub.FlySpeed = data.FlySpeed end
+    if data.OrbitMode ~= nil then NightHub.OrbitMode = data.OrbitMode end
     if data.FixedDepth ~= nil then NightHub.FixedDepth = data.FixedDepth end
     if data.MaxDetectionRange ~= nil then NightHub.MaxDetectionRange = data.MaxDetectionRange end
     if data.HitboxSize ~= nil then NightHub.HitboxSize = data.HitboxSize end
@@ -1123,6 +1126,9 @@ end
 -- =========================================================================
 local farmFlying = false
 local currentTarget = nil
+local currentTargetModel = nil
+local isCurrentVoidShade = false
+local orbitAngle = 0
 local farmChar, farmRoot, farmHum
 
 local function updateFarmChar()
@@ -1181,8 +1187,10 @@ function iniciarFarm()
         end
     end)
     
-    -- Busca de Alvo (também detecta VoidShades)
+    -- Busca de Alvo (detecta VoidShades e Gregg)
     local targetSearchRunning = true
+    local greggFound = false
+    local orbitWasAuto = false
     if Connections.FarmTargetSearch then Connections.FarmTargetSearch:Disconnect() end
     Connections.FarmTargetSearch = task.spawn(function()
         while targetSearchRunning and NightHub.FarmAtivo do
@@ -1190,9 +1198,14 @@ function iniciarFarm()
                 if not updateFarmChar() then return end
                 
                 local closestNormal = nil
+                local closestNormalModel = nil
                 local closestVoid = nil
+                local closestVoidModel = nil
+                local closestGregg = nil
+                local closestGreggModel = nil
                 local shortestNormal = NightHub.MaxDetectionRange
                 local shortestVoid = NightHub.MaxDetectionRange
+                local shortestGregg = NightHub.MaxDetectionRange
                 
                 for _, v in pairs(workspace:GetDescendants()) do
                     if v:IsA("Humanoid") and v.Parent ~= farmChar and v.Health > 0 then
@@ -1200,23 +1213,60 @@ function iniciarFarm()
                         local targetPart = getBestPart(model)
                         if targetPart and targetPart:IsA("BasePart") then
                             local d = (targetPart.Position - farmRoot.Position).Magnitude
+                            local nameLower = string.lower(model.Name)
                             
-                            if isVoidShade(model.Name) then
+                            if string.find(nameLower, "gregg") then
+                                if d < shortestGregg then
+                                    shortestGregg = d
+                                    closestGregg = targetPart
+                                    closestGreggModel = model
+                                end
+                            elseif isVoidShade(model.Name) then
                                 if d < shortestVoid then
                                     shortestVoid = d
                                     closestVoid = targetPart
+                                    closestVoidModel = model
                                 end
                             else
                                 if d < shortestNormal then
                                     shortestNormal = d
                                     closestNormal = targetPart
+                                    closestNormalModel = model
                                 end
                             end
                         end
                     end
                 end
                 
-                currentTarget = closestNormal or closestVoid
+                -- Gregg tem prioridade máxima
+                if closestGregg then
+                    if not greggFound then
+                        greggFound = true
+                        orbitWasAuto = not NightHub.OrbitMode
+                        NightHub.OrbitMode = true
+                    end
+                    currentTarget = closestGregg
+                    currentTargetModel = closestGreggModel
+                    isCurrentVoidShade = false
+                else
+                    -- Gregg morreu ou desapareceu, desativa orbit auto
+                    if greggFound then
+                        greggFound = false
+                        if orbitWasAuto then
+                            NightHub.OrbitMode = false
+                            orbitWasAuto = false
+                        end
+                    end
+                    if closestNormal then
+                        currentTarget = closestNormal
+                        currentTargetModel = closestNormalModel
+                        isCurrentVoidShade = false
+                    elseif closestVoid then
+                        currentTarget = closestVoid
+                        currentTargetModel = closestVoidModel
+                        isCurrentVoidShade = true
+                    end
+                end
             end)
             task.wait(0.3)
         end
@@ -1253,18 +1303,68 @@ function iniciarFarm()
             
             if currentTarget and currentTarget:IsA("BasePart") and currentTarget.Parent then
                 local targetPos = currentTarget.Position
-                local undergroundPos = Vector3.new(targetPos.X, targetPos.Y + NightHub.FixedDepth, targetPos.Z)
-                local direction = (undergroundPos - farmRoot.Position)
                 
-                if direction.Magnitude > 1 then
-                    bv.Velocity = direction.Unit * NightHub.FlightSpeed
+                if NightHub.OrbitMode then
+                    -- ORBIT MODE: gira ao redor de qualquer NPC
+                    orbitAngle = orbitAngle + 0.02
+                    local orbitRadius = 8
+                    local orbitX = math.cos(orbitAngle) * orbitRadius
+                    local orbitZ = math.sin(orbitAngle) * orbitRadius
+                    local orbitPos = targetPos + Vector3.new(orbitX, 0, orbitZ)
+                    
+                    local direction = (orbitPos - farmRoot.Position)
+                    if direction.Magnitude > 1 then
+                        bv.Velocity = direction.Unit * NightHub.FlightSpeed
+                    else
+                        bv.Velocity = Vector3.new(0, 0, 0)
+                    end
+                    
+                    bg.CFrame = CFrame.new(farmRoot.Position, Vector3.new(targetPos.X, farmRoot.Position.Y, targetPos.Z))
+                elseif isCurrentVoidShade and currentTargetModel then
+                    -- VOIDSHADE: fica atrás dele, desvia quando ele olha para ti
+                    local voidLook = currentTarget.CFrame.LookVector
+                    local toPlayer = (farmRoot.Position - targetPos)
+                    toPlayer = Vector3.new(toPlayer.X, 0, toPlayer.Z)
+                    if toPlayer.Magnitude > 0.1 then
+                        toPlayer = toPlayer.Unit
+                    else
+                        toPlayer = Vector3.new(0, 0, -1)
+                    end
+                    
+                    local dot = voidLook:Dot(toPlayer)
+                    
+                    local backPos
+                    if dot > 0.3 then
+                        local behind = -voidLook
+                        backPos = targetPos + behind * 15
+                    else
+                        local behind = -voidLook
+                        backPos = targetPos + behind * 15
+                    end
+                    
+                    local direction = (backPos - farmRoot.Position)
+                    if direction.Magnitude > 1 then
+                        bv.Velocity = direction.Unit * NightHub.FlightSpeed
+                    else
+                        bv.Velocity = Vector3.new(0, 0, 0)
+                    end
+                    
+                    bg.CFrame = CFrame.new(farmRoot.Position, Vector3.new(targetPos.X, farmRoot.Position.Y, targetPos.Z))
                 else
-                    bv.Velocity = Vector3.new(0, 0, 0)
+                    -- NPC normal: vai underground
+                    local undergroundPos = Vector3.new(targetPos.X, targetPos.Y + NightHub.FixedDepth, targetPos.Z)
+                    local direction = (undergroundPos - farmRoot.Position)
+                    
+                    if direction.Magnitude > 1 then
+                        bv.Velocity = direction.Unit * NightHub.FlightSpeed
+                    else
+                        bv.Velocity = Vector3.new(0, 0, 0)
+                    end
+                    
+                    bg.CFrame = CFrame.new(farmRoot.Position, Vector3.new(targetPos.X, farmRoot.Position.Y, targetPos.Z))
                 end
-                
-                bg.CFrame = CFrame.new(farmRoot.Position, Vector3.new(targetPos.X, farmRoot.Position.Y, targetPos.Z))
             else
-                -- Anda para a frente
+                orbitAngle = 0
                 local forward = farmRoot.CFrame.LookVector
                 bv.Velocity = Vector3.new(forward.X, 0, forward.Z).Unit * (NightHub.FlightSpeed * 0.7)
             end
@@ -1275,6 +1375,9 @@ end
 function pararFarm()
     farmFlying = false
     currentTarget = nil
+    currentTargetModel = nil
+    isCurrentVoidShade = false
+    orbitAngle = 0
     NightHub.FarmAtivo = false
     
     if bv and not NightHub.FlyAtivo then
@@ -1481,6 +1584,7 @@ CreateToggleWithBind(FarmPage, "Auto Farm (Normal > VoidShade)", false, Binds.Fa
     function(value) NightHub.FarmAtivo = value; if value then iniciarFarm() else pararFarm() end end,
     function(bind) Binds.Farm = bind end
 )
+CreateToggle(FarmPage, "Orbit Mode (gira ao redor dos NPCs)", NightHub.OrbitMode, "OrbitMode", function(value) NightHub.OrbitMode = value end)
 
 CreateSlider(FarmPage, "Velocidade do Farm", 10, 30, NightHub.FlightSpeed, function(value) NightHub.FlightSpeed = value end)
 CreateSlider(FarmPage, "Profundidade", -30, -5, NightHub.FixedDepth, function(value) NightHub.FixedDepth = value end)
