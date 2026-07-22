@@ -1129,6 +1129,12 @@ local currentTarget = nil
 local currentTargetModel = nil
 local isCurrentVoidShade = false
 local orbitAngle = 0
+local currentBoss = nil
+local bossLastSeen = 0
+local BossPositions = {
+    ["Adelys"] = { pos = Vector3.new(1585, -487, 98), cooldown = 8 },
+    ["The Voidborn"] = { pos = Vector3.new(2352, -621, 87), cooldown = 10 },
+}
 local farmChar, farmRoot, farmHum
 
 local function updateFarmChar()
@@ -1197,6 +1203,7 @@ function iniciarFarm()
             pcall(function()
                 if not updateFarmChar() then return end
                 
+                local bossFound = false
                 local closestNormal = nil
                 local closestNormalModel = nil
                 local closestVoid = nil
@@ -1215,7 +1222,15 @@ function iniciarFarm()
                             local d = (targetPart.Position - farmRoot.Position).Magnitude
                             local nameLower = string.lower(model.Name)
                             
-                            if string.find(nameLower, "gregg") then
+                            if string.find(nameLower, "adelys") then
+                                currentBoss = "Adelys"
+                                bossFound = true
+                                bossLastSeen = tick()
+                            elseif string.find(nameLower, "the voidborn") then
+                                currentBoss = "The Voidborn"
+                                bossFound = true
+                                bossLastSeen = tick()
+                            elseif string.find(nameLower, "gregg") then
                                 if d < shortestGregg then
                                     shortestGregg = d
                                     closestGregg = targetPart
@@ -1235,6 +1250,19 @@ function iniciarFarm()
                                 end
                             end
                         end
+                    end
+                end
+                
+                -- Boss cooldown: manter posicao por Xs apos boss morrer
+                if not bossFound and currentBoss then
+                    local cd = BossPositions[currentBoss] and BossPositions[currentBoss].cooldown or 4
+                    if (tick() - bossLastSeen) >= cd then
+                        currentBoss = nil
+                    else
+                        currentTarget = nil
+                        currentTargetModel = nil
+                        isCurrentVoidShade = false
+                        return
                     end
                 end
                 
@@ -1301,7 +1329,25 @@ function iniciarFarm()
         pcall(function()
             if not updateFarmChar() then return end
             
-            if currentTarget and currentTarget:IsA("BasePart") and currentTarget.Parent then
+            local goToBoss = false
+            if currentBoss and BossPositions[currentBoss] then
+                if currentTarget and currentTarget:IsA("BasePart") and currentTarget.Parent then
+                    goToBoss = false
+                else
+                    goToBoss = true
+                end
+            end
+
+            if goToBoss then
+                local bossPos = BossPositions[currentBoss].pos
+                local direction = (bossPos - farmRoot.Position)
+                if direction.Magnitude > 2 then
+                    bv.Velocity = direction.Unit * NightHub.FlightSpeed
+                else
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                end
+                bg.CFrame = CFrame.new(farmRoot.Position, Vector3.new(bossPos.X, farmRoot.Position.Y, bossPos.Z))
+            elseif currentTarget and currentTarget:IsA("BasePart") and currentTarget.Parent then
                 local targetPos = currentTarget.Position
                 
                 if NightHub.OrbitMode then
@@ -1377,6 +1423,7 @@ function pararFarm()
     currentTarget = nil
     currentTargetModel = nil
     isCurrentVoidShade = false
+    currentBoss = nil
     orbitAngle = 0
     NightHub.FarmAtivo = false
     
@@ -2237,4 +2284,3 @@ end
 print("Night Hub + Void-Stalker Farm + Fly Manual + Auto Sell ativado com sucesso!")
 print("Abas: Combate | Farm | Dungeon | Sell | Profile | Config")
 print("Binds: Spammer=R | Farm=G | Fly=F | NoVFX=H | Speed=J | UI=K | Dungeon=L")
-
